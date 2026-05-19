@@ -2,211 +2,337 @@
   {
     "id": 1,
     "cat": "k8s",
-    "title": "K8s 核心组件有哪些？部署一个 Pod 的完整流程？",
-    "core": "Master: apiserver / etcd / scheduler / controller-manager\nNode: kubelet / kube-proxy / 容器运行时\n\n部署流程：kubectl → apiserver → etcd → scheduler 选节点 → kubelet 拉镜像启动",
-    "detail": "### 组件详解\n\n**apiserver** — 集群的\"前门\"，所有操作必过\n  kubectl、UI、Pod 都通过它和集群交互\n\n**etcd** — 分布式 KV 存储，保存全部集群状态\n  只有 apiserver 能直接读写 etcd\n\n**scheduler** — 把 Pod 分配到合适节点\n  两步走：过滤（资源够不够）→ 打分（选最优）\n\n**controller-manager** — 运行各种控制器\n  Deployment、ReplicaSet、Node 等控制器都在这\n\n**kubelet** — 节点上的代理\n  接收调度指令 → 创建容器 → 上报状态\n\n### 部署 Nginx 的完整流程\n\n  kubectl apply -f nginx.yaml\n  ① apiserver 收到请求，校验权限\n  ② 写入 etcd\n  ③ scheduler 发现未调度 Pod\n  ④ 过滤+打分 → 绑定到 node1\n  ⑤ node1 的 kubelet 收到绑定\n  ⑥ kubelet 调用 containerd 拉镜像\n  ⑦ 启动容器，上报 Running 状态"
+    "title": "请简述Kubernetes的核心组件及其作用？",
+    "core": "**答案：**\n- **API Server**: 集群的统一入口，提供RESTful API接口\n- **etcd**: 分布式键值存储，保存集群状态数据\n- **Scheduler**: 负责Pod的调度决策\n- **Controller Manager**: 管理各种控制器，确保期望状态与实际状态一致\n- **kubelet**: 节点代理，管理Pod生命周期",
+    "detail": "**答案：**\n- **API Server**: 集群的统一入口，提供RESTful API接口\n- **etcd**: 分布式键值存储，保存集群状态数据\n- **Scheduler**: 负责Pod的调度决策\n- **Controller Manager**: 管理各种控制器，确保期望状态与实际状态一致\n- **kubelet**: 节点代理，管理Pod生命周期\n- **kube-proxy**: 网络代理，实现Service负载均衡\n- **Container Runtime**: 容器运行时（如Docker、containerd）"
   },
   {
     "id": 2,
     "cat": "k8s",
-    "title": "Pod 一直 Pending 的排查步骤？",
-    "core": "kubectl describe pod <name> 看 Events\n\n常见原因：\n• 资源不足 → 加节点或减 request\n• PVC 未绑定 → 检查 PV/StorageClass\n• 镜像拉取失败 → 检查镜像名\n• NodeSelector/Taint 不匹配",
-    "detail": "### 标准排障流程\n\n  # 1. 看状态和 Events\n  kubectl get pod\n  kubectl describe pod <name> | grep -A 10 Events\n\n  # 2. 看节点资源\n  kubectl top nodes\n  df -h /var/lib/kubelet           # 磁盘满？\n\n  # 3. 看镜像\n  kubectl describe pod <name> | grep -i image\n\n  # 4. 看调度约束\n  kubectl get nodes --show-labels\n\n### 现实案例\n\n有一次 Pod 一直 Pending，describe 看到：\n  0/5 nodes available: 5 Insufficient cpu.\n原来是新加了 CronJob，request 配高了，\n把 limits 降低就好了。"
+    "title": "什么是CNI、CSI、CRI、LB？它们在K8s中的作用是什么？",
+    "core": "CNI、CSI、CRI 是Kubernetes的三大核心扩展接口，分别定义了网络、存储、运行时的标准；而LB是Service的一种对外暴露方式，通常依赖云厂商或软件实现。\n#### 2.1 CNI\n- **CNI (Container Network Interface)**: 容器网络接口，负责为Pod分配IP地址、让pod之间能够相互通信。常见插件有Calico、Flannel。\n| 插件     | 特点                                                         | 适用场景           |",
+    "detail": "CNI、CSI、CRI 是Kubernetes的三大核心扩展接口，分别定义了网络、存储、运行时的标准；而LB是Service的一种对外暴露方式，通常依赖云厂商或软件实现。\n\n#### 2.1 CNI\n\n- **CNI (Container Network Interface)**: 容器网络接口，负责为Pod分配IP地址、让pod之间能够相互通信。常见插件有Calico、Flannel。\n\n| 插件     | 特点                                                         | 适用场景           |\n| -------- | ------------------------------------------------------------ | ------------------ |\n| Flannel  | 架构简单，支持 VXLAN/host-gw，性能中等，vxlan每次转发都要额外封包/解包 | 测试/小规模集群    |\n| Calico   | BGP路由协议实现纯三层路由转发，支持 NetworkPolicy（相当于pod级别的防火墙），性能优秀 | 生产环境首选       |\n| Cilium   | 基于 eBPF，高性能，L7 可见性，支持 Service Mesh              | 高性能/安全要求高  |\n| Weave    | 支持加密，配置简单                                           | 中小型集群         |\n| kube-OVN | **企业级网络架构师**  基于 OVN/OVS，功能丰富                 | OpenShift/大型集群 |\n\n> Flannel：最简单、最轻量，只做网络连通，啥高级功能都没有\n> Calico：纯三层路由 + BGP，性能强，NetworkPolicy 强，通用云原生首选\n> Kube-OVN：企业级 SDN 架构，VPC 多租户、Underlay 强、功能最全，灵雀云自家核心 CNI\n\n#### 2.2 CSI\n\n- **CSI (Container Storage Interface)**: 容器存储接口，让外部存储卷能以标准化的方式被Pod挂载使用，提供持久化存储能力。通过 CSI 接口对接第三方存储插件（如 NFS、CephFS、各厂商云盘），实现存储卷（PV、PVC）的创建、挂载、卸载、删除，让 Pod 能像使用本地磁盘一样使用外部持久化存储，保障数据的持久性（如数据库 Pod 的数据留存）。\n\n**存储流程：**\n\n1. 用户创建PVC，声明存储需求（大小、访问模式、StorageClass）；\n2. PV Controller通过StorageClass调用CSI插件创建PV，并完成PVC与PV绑定；\n3. Pod调度后，kubelet调用CSI插件将存储挂载至容器；\n4. Pod删除时，CSI插件依次执行存储卸载、解绑及删除操作。\n\n#### 2.3 CRI\n\n- **CRI (Container Runtime Interface)：** 容器运行时接口，如Docker、containerd、CRI-O。\n- CRI负责管理K8s集群容器生命周期，控制平面通过CRI接口对接containerd、CRI-O等容器运行时，发送容器创建、启停、删除等指令，实现二者解耦，提升集群灵活性与可扩展性。\n\n#### 2.4 LB\n\n- **LB (Load Balancer)**: 负载均衡器，分发外部流量到后端服务"
   },
   {
     "id": 3,
     "cat": "k8s",
-    "title": "Deployment 滚动更新和回滚怎么操作？",
-    "core": "滚动更新：新旧 RS 逐步切换\n  maxSurge=25%，maxUnavailable=25%\n\n回滚命令：\n  kubectl rollout undo deployment/<name>\n  kubectl rollout undo deployment/<name> --to-revision=2",
-    "detail": "### 滚动更新流程\n\n  期望 4 个 Pod，maxSurge=1，maxUnavailable=0\n  旧 RS 缩到 3 → 新 RS 扩到 1（共 4 个）\n  旧 RS 缩到 2 → 新 RS 扩到 2\n  ...直到全部切到新 RS\n\n### 常用命令\n\n  # 查看发布状态\n  kubectl rollout status deploy/nginx\n\n  # 查看历史版本\n  kubectl rollout history deploy/nginx\n\n  # 暂停/恢复发布\n  kubectl rollout pause deploy/nginx\n  kubectl rollout resume deploy/nginx\n\n### 生产经验\n\n如果要零停机更新，设 maxUnavailable=0\n这样永远不会同时杀掉两个 Pod"
+    "title": "Docker 与 Containerd 区别",
+    "core": "1. containerd 为 K8s 官方默认运行时，轻量化、专注容器运行；Docker 是完整工具链，冗余组件多。\n2. K8s 通过 CRI 接口对接运行时，不直接适配 Docker。\n3. 生产环境 containerd 稳定性、资源占用、集群兼容性更优。",
+    "detail": "1. containerd 为 K8s 官方默认运行时，轻量化、专注容器运行；Docker 是完整工具链，冗余组件多。\n2. K8s 通过 CRI 接口对接运行时，不直接适配 Docker。\n3. 生产环境 containerd 稳定性、资源占用、集群兼容性更优。"
   },
   {
     "id": 4,
     "cat": "k8s",
-    "title": "Service 几种类型和访问链路？NodePort 端口范围？",
-    "core": "四种类型：ClusterIP / NodePort / LoadBalancer / ExternalName\n\nNodePort 端口范围：30000-32767\n\n链路：用户 → NodeIP:NodePort → ClusterIP → PodIP",
-    "detail": "### 访问链路详解\n\n  NodePort 模式：\n  用户 → curl node1:30080\n       → kube-proxy (iptables/IPVS)\n       → 随机选一个后端 Pod\n       → Pod 返回响应\n\n  ClusterIP 模式（内部）：\n  Pod 内 → service-name.namespace.svc → ClusterIP → Pod\n\n### 排障技巧\n\n  # 看 Service 端点\n  kubectl get endpoints <svc-name>\n\n  # 如果没有 Endpoints\n  # → 检查 Pod 标签是否匹配 selector\n\n  # 用 busybox 调试 DNS\n  kubectl run -it --rm debug --image=busybox -- nslookup <svc-name>"
+    "title": "PV / PVC / StorageClass",
+    "core": "+ PVC：用户侧存储需求声明；\n+ PV：集群实际存储资源\n+ StorageClass：动态存储分配，自动创建绑定 PV，适配大规模业务",
+    "detail": "+ PVC：用户侧存储需求声明；\n+ PV：集群实际存储资源\n+ StorageClass：动态存储分配，自动创建绑定 PV，适配大规模业务"
   },
   {
     "id": 5,
     "cat": "k8s",
-    "title": "CrashLoopBackOff 怎么排查？Exit Code 分别代表什么？",
-    "core": "137 → OOM（内存超限）\n143 → SIGTERM 超时被杀\n  1  → 应用自身报错\n\nkubectl logs --previous <pod> 看上一步崩溃日志",
-    "detail": "### 排查步骤\n\n  # 1. 看退出码\n  kubectl describe pod <name> | grep -A 5 \"Last State\"\n\n  # 2. 看日志\n  kubectl logs <name>\n  kubectl logs --previous <name>   # 上一步的日志\n\n  # 3. 常见原因针对性解决\n  137 → 调大 limits.memory\n  143 → 检查 preStop 和 terminationGracePeriodSeconds\n  1   → 应用配置错误，看日志\n\n### OOM 案例分析\n\n  有一次 Redis Pod 一直 CrashLoopBackOff，\n  Exit Code 137，describe 看到 OOMKilled。\n  原来 limits.memory 只配了 64Mi，\n  调大到 256Mi 后恢复。"
+    "title": "Kubernetes Service 的类型有哪些？LoadBalancer 类型是如何工作的？",
+    "core": "#### 5.1 service类型\n+ **ClusterIP：**默认类型，仅提供集群内部可访问的虚拟IP，只能在集群内Pod之间访问，无法被外部访问。\n+ **NodePort**：在集群所有节点上开放一个相同的静态端口，外部可通过“节点IP+NodePort端口”访问集群内服务。\n+ **LoadBalancer**：结合云厂商负载均衡器使用，在 NodePort 基础上申请云厂商 LB，自动创建外部LB实例，实现外部流量接入和负载分发，是外部访问集群的常用方式。\n+ **ExternalName**：通过域名映射，将Service映射到集群外部的域名，无需选择器，直接转发请求到外部域名。",
+    "detail": "#### 5.1 service类型\n\n+ **ClusterIP：**默认类型，仅提供集群内部可访问的虚拟IP，只能在集群内Pod之间访问，无法被外部访问。\n+ **NodePort**：在集群所有节点上开放一个相同的静态端口，外部可通过“节点IP+NodePort端口”访问集群内服务。\n+ **LoadBalancer**：结合云厂商负载均衡器使用，在 NodePort 基础上申请云厂商 LB，自动创建外部LB实例，实现外部流量接入和负载分发，是外部访问集群的常用方式。\n+ **ExternalName**：通过域名映射，将Service映射到集群外部的域名，无需选择器，直接转发请求到外部域名。\n+ **Headless Service**: 无ClusterIP，用于StatefulSet\n\n#### 5.2  LoadBalancer 工作原理\n\n+ 用户创建LoadBalancer类型Service后，K8s首先为其分配一个NodePort，随后云控制器管理器（CCM）调用云厂商API，创建外部四层负载均衡器（LB），该LB的后端服务器为集群所有节点的IP及分配的NodePort端口。\n+ 外部流量首先到达该云LB，LB按预设策略（如轮询）将流量转发至集群某节点的NodePort。\n+ 流量到达节点后，通过kube-proxy的iptables/IPVS规则，进一步负载均衡到后端健康Pod。\n+ 其中，LB通过云厂商API读取由EndpointSlice控制器维护的健康Pod Endpoint列表，结合自身健康探测剔除故障Pod，确保流量仅转发至健康节点及对应Pod，实现外部流量稳定接入和负载分担。"
   },
   {
     "id": 6,
     "cat": "k8s",
-    "title": "etcd 挂了会怎样？日常怎么维护？",
-    "core": "etcd 挂了：\n• 已有 Pod 照跑（kubelet 独立运行）\n• kubectl 全部操作失败\n• etcd 恢复后集群自动恢复\n\n维护：定期 compaction + defrag",
-    "detail": "### 影响说明\n\n  etcd 是集群的\"数据库\"：\n  - 所有配置都存在 etcd\n  - 只有 apiserver 读写 etcd\n  - kubelet 在节点上独立工作\n\n  所以 etcd 挂了：\n  ✅ 已有 Pod 继续运行\n  ❌ 不能创建/更新/删除资源\n  ❌ kubectl 命令全部失败\n  ✅ etcd 恢复后一切正常\n\n### 日常维护\n\n  # 查看 etcd 状态\n  etcdctl endpoint health\n  etcdctl endpoint status\n\n  # 压缩旧版本（避免 etcd 太大）\n  etcdctl compact $(etcdctl endpoint status --write-out=json | jq -r '.[0].Status.header.revision')\n\n  # 碎片整理\n  etcdctl defrag\n\n  # 检查 db 大小（超过 2GB 要注意）\n  ls -lh /var/lib/etcd/member/snap/db\n\n### 最佳实践\n\n  3 或 5 节点奇数 etcd 集群\n  专用 SSD 磁盘\n  定期备份 etcd 数据"
+    "title": "请你简单说说docker的核心原理",
+    "core": "+ **Namespace（命名空间）**：实现容器隔离，通过隔离进程、网络、主机名等，让容器与宿主机、其他容器互不干扰。\n+ **CGroups（控制组）**：限制容器的CPU、内存、IO等宿主机资源，避免资源过度占用。\n+ **UnionFS（联合文件系统）**：采用分层存储，共享镜像只读层，节省空间、提升部署效率。\n> Docker通过这三大技术，实现“一次构建、到处运行”，解决环境一致性问题，且比传统虚拟机更轻量、启动更快。",
+    "detail": "+ **Namespace（命名空间）**：实现容器隔离，通过隔离进程、网络、主机名等，让容器与宿主机、其他容器互不干扰。\n+ **CGroups（控制组）**：限制容器的CPU、内存、IO等宿主机资源，避免资源过度占用。\n+ **UnionFS（联合文件系统）**：采用分层存储，共享镜像只读层，节省空间、提升部署效率。\n\n> Docker通过这三大技术，实现“一次构建、到处运行”，解决环境一致性问题，且比传统虚拟机更轻量、启动更快。"
   },
   {
     "id": 7,
     "cat": "k8s",
-    "title": "Taint 和 Toleration 怎么用？GPU 专用节点怎么实现？",
-    "core": "Taint 在节点上，Toleration 在 Pod 上。\n\nGPU 专用节点：\n  kubectl taint nodes gpu-node gpu=true:NoSchedule\n  只有加了 toleration 的 Pod 才能调度上去",
-    "detail": "### 命令示例\n\n  # 打污点\n  kubectl taint nodes node1 key=value:NoSchedule\n\n  # 移除污点（后面加 -）\n  kubectl taint nodes node1 key=value:NoSchedule-\n\n  # Pod 加容忍\n  tolerations:\n  - key: gpu\n    operator: Equal\n    value: \"true\"\n    effect: NoSchedule\n\n### 3 个 Effect\n\n  NoSchedule — 不容忍则不调度\n  PreferNoSchedule — 尽量不调度\n  NoExecute — 不容忍则驱逐已有 Pod\n\n### 场景：节点维护\n\n  想清空一个节点做维护：\n  kubectl taint nodes node1 maintain=:NoExecute\n  → 所有 Pod 被驱逐到其他节点\n  → 维护完成后移除污点"
+    "title": "你在日常工作中是如何优化docker镜像的",
+    "core": "+ **使用多阶段构建**，减小最终镜像体积\n+ **合并 RUN 指令**，减少镜像层数\n+ **使用 .dockerignore** 排除无关文件\n+ **选择最小基础镜像**（alpine、distroless）\n+ **将变化频率低的指令放在前面**，充分利用缓存",
+    "detail": "+ **使用多阶段构建**，减小最终镜像体积\n+ **合并 RUN 指令**，减少镜像层数\n+ **使用 .dockerignore** 排除无关文件\n+ **选择最小基础镜像**（alpine、distroless）\n+ **将变化频率低的指令放在前面**，充分利用缓存"
   },
   {
     "id": 8,
     "cat": "k8s",
-    "title": "HPA 自动扩缩容怎么配置？",
-    "core": "基于 CPU/内存/自定义指标自动调整副本数。\n\n  kubectl autoscale deploy myapp --min=2 --max=10 --cpu-percent=80",
-    "detail": "### 完整 YAML\n\n  apiVersion: autoscaling/v2\n  kind: HorizontalPodAutoscaler\n  metadata:\n    name: myapp-hpa\n  spec:\n    scaleTargetRef:\n      apiVersion: apps/v1\n      kind: Deployment\n      name: myapp\n    minReplicas: 2\n    maxReplicas: 10\n    metrics:\n    - type: Resource\n      resource:\n        name: cpu\n        target:\n          type: Utilization\n          averageUtilization: 80\n\n### 计算公式\n\n  目标副本 = ceil(当前副本 × 当前利用率 / 目标利用率)\n\n  举例：4 个 Pod，CPU 平均 90%，目标 80%\n  目标 = ceil(4 × 90 / 80) = ceil(4.5) = 5\n\n### 生产经验\n\n  - 冷却时间默认 5 分钟，避免频繁上下波动\n  - 需要先装 Metrics Server\n  - 自定义指标（如 QPS）需要 Prometheus Adapter"
+    "title": "你了解过EndpointSlice吗？",
+    "core": "**为什么需要 EndpointSlice？**\nKubernetes 从 v1.21 开始引入 EndpointSlice（GA），主要是为了解决旧版 Endpoints 对象在大规模集群中的性能问题。\n**核心设计：分片存储**\n每个 EndpointSlice 默认最多存储 100 个端点地址。当服务后端 Pod 数量巨大（如上千个）时，控制器会自动将端点信息拆分到多个 EndpointSlice 中。\n**好处：**\n避免维护一个巨大的 Endpoints 对象。当 Pod 状态变化时，只需更新受影响的小分片，大幅减轻 API Server 和 kube-proxy 的压力，提升集群的伸缩性和响应速度。",
+    "detail": "**为什么需要 EndpointSlice？**\n\nKubernetes 从 v1.21 开始引入 EndpointSlice（GA），主要是为了解决旧版 Endpoints 对象在大规模集群中的性能问题。\n\n**核心设计：分片存储**\n每个 EndpointSlice 默认最多存储 100 个端点地址。当服务后端 Pod 数量巨大（如上千个）时，控制器会自动将端点信息拆分到多个 EndpointSlice 中。\n\n**好处：**\n避免维护一个巨大的 Endpoints 对象。当 Pod 状态变化时，只需更新受影响的小分片，大幅减轻 API Server 和 kube-proxy 的压力，提升集群的伸缩性和响应速度。\n\n**兼容性：**\n旧的 Endpoints 对象目前依然存在（在 v1.33 中标记为“遗留”资源），与 EndpointSlice 并存以保证向后兼容。"
   },
   {
     "id": 9,
-    "cat": "linux",
-    "title": "如何找出 CPU 占用最高的进程？",
-    "core": "# 实时查看\ntop（按 P 按 CPU 排序）\nhtop（更直观）\n\n# 一次性命令\nps aux --sort=-%cpu | head -10\n\n# 查看具体线程\ntop -H -p <pid>",
-    "detail": "### 排查 CPU 飙升三步法\n\n  # Step 1：看哪个进程在吃 CPU\n  top -bn1 | head -20\n\n  # Step 2：如果是 Java，看具体线程\n  top -H -p <pid>\n  # 记下高 CPU 的线程 ID（十进制）\n  printf \"%x\n\" <tid>        # 转十六进制\n  jstack <pid> | grep -A 20 <tid-hex>\n\n  # Step 3：看这个进程在干什么\n  strace -p <pid>\n  lsof -p <pid>\n\n### 实用工具对标\n\n  top → 系统自带\n  htop → 更友好，支持鼠标\n  btop → 颜值最高，带图表\n  glances → 全能监控\n\n### 真实场景\n\n  有一次线上告警 CPU 100%，\n  用 top 找到是 rsync 进程在跑增量同步，\n  cron 配了每分钟同步一次，改成每 5 分钟后解决。"
+    "cat": "k8s",
+    "title": "生产环境中，如果你遇到pod访问不通，你怎么排查？",
+    "core": "+ 先查Pod状态，用kubectl get pods看是否为Running，Pending查资源和镜像，CrashLoopBackOff查应用日志。\n+ Pod正常则进入内部，用curl测试本地应用，ping其他Pod或DNS排查网络栈。\n+ 集群内访问不通，检查Service标签匹配度、Endpoint/EndpointSlice，以及kube-proxy和转发规则。\n+ 外部访问失败，检查LB/NodePort配置、节点防火墙，有Ingress则检查其规则和控制器。\n+ 以上正常则排查Calico、Flannel等网络插件是否运行正常。",
+    "detail": "+ 先查Pod状态，用kubectl get pods看是否为Running，Pending查资源和镜像，CrashLoopBackOff查应用日志。\n+ Pod正常则进入内部，用curl测试本地应用，ping其他Pod或DNS排查网络栈。\n+ 集群内访问不通，检查Service标签匹配度、Endpoint/EndpointSlice，以及kube-proxy和转发规则。\n+ 外部访问失败，检查LB/NodePort配置、节点防火墙，有Ingress则检查其规则和控制器。\n+ 以上正常则排查Calico、Flannel等网络插件是否运行正常。\n\n总结：先查Pod本身，再排查关联组件，最后查外部接入，快速缩小故障范围。"
   },
   {
     "id": 10,
-    "cat": "linux",
-    "title": "磁盘空间满了怎么排查？哪些目录最可能占满？",
-    "core": "df -h               # 看分区使用率\ndu -sh /* | sort -rh  # 从根目录排查\ndu -sh /var/log/*     # 日志是头号嫌疑\n\n大文件排查：\nfind / -type f -size +100M -exec ls -lh {} \\;",
-    "detail": "### 标准流程\n\n  # 1. 看哪个分区满了\n  df -h\n\n  # 2. 从根开始找大目录\n  cd / && du -sh * | sort -rh | head -10\n\n  # 3. 经常中招的目录\n  /var/log/           # 日志\n  /var/lib/docker/    # Docker 镜像和容器\n  /tmp/               # 临时文件\n  /var/cache/         # 缓存\n\n  # 4. 找大文件\n  find / -type f -size +500M -exec ls -lh {} ; 2>/dev/null\n\n### inode 满了\n\n  df -i               # 看 inode 使用率\n  # inode 满说明小文件太多\n  # 常见：Docker overlay2 目录、邮件队列\n\n  find / -xdev -type f | cut -d/ -f2 | sort | uniq -c | sort -n | tail -5\n\n### 日志清理脚本\n\n  # 保留最近 7 天日志\n  find /var/log -name \"*.log\" -mtime +7 -delete\n  # 用 logrotate 自动管理\n  cat /etc/logrotate.d/nginx"
+    "cat": "k8s",
+    "title": "PVC 一直 Pending 怎么排查？",
+    "core": "+ 第一步，用`kubectl describe pvc 名称 -n 命名空间`查看事件，这是最直接的排查方式，能快速获取Pending原因。\n+ 第二步，排查是否有匹配的PV：查看集群内PV状态（`kubectl get pv`），确认PV的大小、访问模式、StorageClass，与PVC声明的一致，无匹配PV则PVC会Pending。\n+ 第三步，排查StorageClass：若PVC指定了StorageClass，检查该SC是否存在、正常（`kubectl get sc`），且SC对应的CSI插件运行正常，否则无法自动创建PV。",
+    "detail": "+ 第一步，用`kubectl describe pvc 名称 -n 命名空间`查看事件，这是最直接的排查方式，能快速获取Pending原因。\n+ 第二步，排查是否有匹配的PV：查看集群内PV状态（`kubectl get pv`），确认PV的大小、访问模式、StorageClass，与PVC声明的一致，无匹配PV则PVC会Pending。\n+ 第三步，排查StorageClass：若PVC指定了StorageClass，检查该SC是否存在、正常（`kubectl get sc`），且SC对应的CSI插件运行正常，否则无法自动创建PV。\n+ 第四步，排查资源限制：确认集群内有足够资源（存储、节点资源），且PV/PVC的访问模式匹配（如PVC要ReadWriteMany，PV需支持该模式）。\n\n总结：核心是通过describe查看事件，再依次排查PV匹配度、StorageClass和资源，快速定位Pending原因。"
   },
   {
     "id": 11,
-    "cat": "linux",
-    "title": "Linux 上怎么查端口被哪个进程占用？",
-    "core": "# 推荐（ss 替代 netstat）\nss -tlnp | grep :80\n\n# 传统方式\nnetstat -tlnp | grep :80\n\n# 哪个进程打开了哪些端口\nlsof -i :80",
-    "detail": "### 各命令详解\n\n  # ss — 现代 Linux 的标配\n  ss -tlnp\n  -t  TCP\n  -l  监听状态\n  -n  不解析主机名\n  -p  显示进程\n\n  # lsof — 更强大\n  lsof -i :3306          # 看 3306 端口\n  lsof -p <pid>          # 看这个进程打开的所有文件\n  lsof +D /var/log/      # 看这个目录下哪些文件被打开\n\n  # fuser — 快速杀进程\n  fuser 80/tcp           # 看 80 端口谁在用\n  fuser -k 80/tcp        # 杀掉占用 80 端口的进程\n\n### 排障场景\n\n  服务启动报 \"port already in use\"\n  ss -tlnp | grep <port>\n  发现是旧进程没完全退出\n  kill -9 <pid> 解决\n\n  Docker 运行 nginx 的 80 端口冲突同理。"
+    "cat": "k8s",
+    "title": "kube-proxy 的 iptables 和 ipvs 模式区别？",
+    "core": "+ iptables：规则逐条匹配，高并发性能差\n+ ipvs：基于哈希表，性能更高，支持更多负载均衡算法，适合大规模集群",
+    "detail": "+ iptables：规则逐条匹配，高并发性能差\n+ ipvs：基于哈希表，性能更高，支持更多负载均衡算法，适合大规模集群"
   },
   {
     "id": 12,
-    "cat": "linux",
-    "title": "systemd 管理服务的常用命令？怎么排查服务启动失败？",
-    "core": "systemctl status <service>     # 看状态\nsystemctl start/stop/restart   # 启停\njournalctl -u <service> -f     # 看实时日志\n\n排查失败：journalctl -xe 看详细错误",
-    "detail": "### 服务管理\n\n  systemctl daemon-reload        # 重载配置文件\n  systemctl enable <service>     # 开机自启\n  systemctl disable <service>    # 取消自启\n  systemctl list-units --type=service  # 列出所有服务\n\n### 排查启动失败\n\n  # 假设 Nginx 启动失败\n  systemctl status nginx\n  ● nginx.service - A high performance web server\n     Loaded: loaded (/usr/lib/systemd/system/nginx.service)\n     Active: failed (Result: exit-code)\n  \n  # 看详细报错\n  journalctl -u nginx -n 50 --no-pager\n  # 或简写\n  journalctl -xe\n\n### 自己写 service 单元\n\n  [Unit]\n  Description=My App\n  After=network.target\n\n  [Service]\n  Type=simple\n  User=appuser\n  ExecStart=/opt/myapp/start.sh\n  Restart=always\n  RestartSec=5\n\n  [Install]\n  WantedBy=multi-user.target"
+    "cat": "k8s",
+    "title": "外部无法访问 Service 怎么排查？",
+    "core": "我会从“集群内验证→Service配置→外部接入→网络层面”逐步排查，核心步骤清晰可落地，具体如下：\n01 先验证集群内是否可访问\nkubectl exec -it 任意Pod -n 命名空间\ncurl ServiceIP:端口\n02 Service配置检查：确认Service类型（LoadBalancer/NodePort）正确，标签选择器与Pod标签匹配，端口映射（port/targetPort）无误\nkubectl describe svc 名称 -n 命名空间",
+    "detail": "我会从“集群内验证→Service配置→外部接入→网络层面”逐步排查，核心步骤清晰可落地，具体如下：\n\n```sh\n01 先验证集群内是否可访问\nkubectl exec -it 任意Pod -n 命名空间\ncurl ServiceIP:端口\n02 Service配置检查：确认Service类型（LoadBalancer/NodePort）正确，标签选择器与Pod标签匹配，端口映射（port/targetPort）无误\nkubectl describe svc 名称 -n 命名空间\n03 排查外部接入组件\n确认LB实例正常运行（通过云控制台或API），转发规则已正确关联集群节点IP和Service分配的NodePort，健康探测配置无误\n04 排查网络与权限\n检查节点防火墙是否放行NodePort端口，网络插件（Calico/Flannel）运行正常，无安全策略拦截外部流量，LB的地址类型（内网/公网）与访问场景匹配。\n\n检查 Pod 是否正常提供服务\n检查 Endpoints 是否有 Pod IP\n检查 NodePort、防火墙、安全组\n检查 kube-proxy 是否正常\n检查 LB 健康检查\n```"
   },
   {
     "id": 13,
-    "cat": "linux",
-    "title": "Linux 文件权限 755/644 是什么意思？SUID/SGID 是什么？",
-    "core": "r=4, w=2, x=1\n755 = rwxr-xr-x（所有者7，组5，其他5）\n644 = rw-r--r--\n\nSUID (4xxx)：以文件所有者身份运行\nSGID (2xxx)：以文件所属组身份运行\nSticky (1xxx)：仅所有者可删（/tmp）",
-    "detail": "### 权限解析\n\n  755: rwx r-x r-x\n  ──┬─ ─┬─ ─┬─\n  所有者 组  其他\n\n  chmod 755 script.sh\n  所有者可以读写执行，其他人只能读和执行\n\n### SUID 示例\n\n  # passwd 就是 SUID 程序\n  ls -l /usr/bin/passwd\n  -rwsr-xr-x   # s 在所有者执行位\n\n  普通用户执行 passwd 时以 root 身份运行\n  才能修改 /etc/shadow\n\n  查看所有 SUID 文件：\n  find / -perm -4000 -type f 2>/dev/null\n\n### 安全建议\n\n  # 不要随意给脚本 777\n  # 检查异常 SUID\n  find / -perm -4000 -type f 2>/dev/null | xargs ls -l\n\n  # /tmp 的 Sticky bit\n  ls -ld /tmp\n  drwxrwxrwt   # t = Sticky bit\n  # 任何人都能在 /tmp 里创建文件\n  # 但只能删除自己的文件"
+    "cat": "k8s",
+    "title": "你熟悉k8s的编排流程吗？",
+    "core": "用户使用kubectl向api-server发起创建pod资源对象的请求；\napi-server验证请求并将其保存在etcd集群中，并基于watch机制通知kube-scheduler调度器；\nkube-scheduler调度器根据预选和优选调度算法为pod选择最优的节点并通知api-server；\napi-server将选择的节点保存在etcd中，并通知kubelet组件；\nkubelet去创建和管理pod对象，与容器交互管理pod的生命周期，并实时上报容器的状态给api-server；\napi-server将容器状态持久保存在etcd中。",
+    "detail": "```sh\n用户使用kubectl向api-server发起创建pod资源对象的请求；\napi-server验证请求并将其保存在etcd集群中，并基于watch机制通知kube-scheduler调度器；\nkube-scheduler调度器根据预选和优选调度算法为pod选择最优的节点并通知api-server；\napi-server将选择的节点保存在etcd中，并通知kubelet组件；\nkubelet去创建和管理pod对象，与容器交互管理pod的生命周期，并实时上报容器的状态给api-server；\napi-server将容器状态持久保存在etcd中。\n```"
   },
   {
     "id": 14,
-    "cat": "linux",
-    "title": "一条命令实时监控多项系统资源？",
-    "core": "# 系统自带\ntop          # 全能\nvmstat 1     # CPU/内存/IO\niostat -x 1  # 磁盘 IO\nsar -n DEV 1 # 网络流量\n\n# 第三方神器\nhtop / btop / glances / dstat",
-    "detail": "### 各场景推荐\n\n  CPU 高 → top → 按 P 排序\n  内存不足 → free -h → top 按 M 排序\n  磁盘 IO 高 → iostat -x 1 → 看 %util\n  网络异常 → sar -n DEV 1 或 nethogs\n  进程调试 → strace -p <pid>\n\n### 搭配 watch 实时刷新\n\n  # 每 2 秒刷新一次\n  watch -n 2 'ps aux --sort=-%cpu | head -10'\n  watch -n 2 'ss -s'                    # TCP 连接统计\n  watch -n 2 'df -h | grep /data'       # 监控特定分区\n\n### 老司机常用组合\n\n  while true; do\n    echo \"=== $(date) ===\"\n    echo \"--- CPU TOP5 ---\"\n    ps aux --sort=-%cpu | head -6\n    echo \"--- 磁盘 ---\"\n    df -h /\n    echo \"--- 内存 ---\"\n    free -h\n    sleep 5\n    clear\n  done"
+    "cat": "k8s",
+    "title": "如何排查一个Pod一直处于Pending状态的问题？",
+    "core": "# 1. 查看Pod详细信息\nkubectl describe pod <pod-name>\n# 2. 检查节点资源是否充足\nkubectl top nodes\nkubectl describe node <node-name>\n# 3. 检查是否有合适的节点满足调度条件",
+    "detail": "```bash\n# 1. 查看Pod详细信息\nkubectl describe pod <pod-name>\n\n# 2. 检查节点资源是否充足\nkubectl top nodes\nkubectl describe node <node-name>\n\n# 3. 检查是否有合适的节点满足调度条件\nkubectl get events --sort-by='.lastTimestamp'\n\n# 4. 检查Taints和Tolerations配置\nkubectl get nodes -o json | jq '.items[].spec.taints'\n\n# 5. 检查ResourceQuota和LimitRange\nkubectl get resourcequota\nkubectl get limitrange\n```"
   },
   {
     "id": 15,
-    "cat": "docker",
-    "title": "Dockerfile 最佳实践有哪些？怎么减小镜像体积？",
-    "core": "• 使用 .dockerignore\n• 多阶段构建（FROM ... AS ...）\n• 合并 RUN 命令减少层\n• 选择 Alpine 基础镜像\n• 不要安装不必要的包",
-    "detail": "### 多阶段构建示例\n\n  # Stage 1：编译\n  FROM golang:1.21 AS builder\n  WORKDIR /app\n  COPY . .\n  RUN CGO_ENABLED=0 go build -o myapp\n\n  # Stage 2：运行\n  FROM alpine:3.19\n  RUN apk --no-cache add ca-certificates\n  COPY --from=builder /app/myapp /myapp\n  CMD [\"/myapp\"]\n\n  # 结果：从 1GB 降到 15MB\n\n### 常用基础镜像大小对比\n\n  ubuntu:22.04     → ~80MB\n  debian:bookworm  → ~50MB\n  alpine:3.19      → ~7MB  ← 推荐\n  distroless       → ~5MB  ← 最安全（只有二进制）\n\n### 排查镜像大小\n\n  docker history <image>     # 看每层大小\n  docker images --format \"{{.Repository}}:{{.Tag}} {{.Size}}\" | sort -k2 -h\n\n### 实际案例\n\n  一个 Node.js 应用镜像从 1.2GB 减到 180MB：\n  ① 多阶段构建（只 COPY dist，不 COPY node_modules）\n  ② 用 alpine 替代 ubuntu\n  ③ npm install --production（不装 devDependencies）"
+    "cat": "k8s",
+    "title": "如何排查 Pod 处于 CrashLoopBackOff 状态的问题？",
+    "core": "# 1. 查看 Pod 状态和事件\nkubectl describe pod <pod-name> -n <namespace>\n# 2. 查看容器日志（包括上一次崩溃的日志）\nkubectl logs <pod-name> -n <namespace> --previous\n# 3. 进入容器调试（如果能起来）\nkubectl exec -it <pod-name> -- /bin/sh",
+    "detail": "```sh\n# 1. 查看 Pod 状态和事件\nkubectl describe pod <pod-name> -n <namespace>\n\n# 2. 查看容器日志（包括上一次崩溃的日志）\nkubectl logs <pod-name> -n <namespace> --previous\n\n# 3. 进入容器调试（如果能起来）\nkubectl exec -it <pod-name> -- /bin/sh\n\n# 4. 查看容器退出码\nkubectl get pod <pod-name> -o jsonpath='{.status.containerStatuses[0].lastState.terminated}'\n```"
   },
   {
     "id": 16,
-    "cat": "docker",
-    "title": "Docker 网络模式有哪几种？bridge 和 host 的区别？",
-    "core": "四种网络模式：\n• bridge — 默认，隔离的网络\n• host — 共享宿主机网络\n• none — 无网络\n• container — 共享另一个容器的网络\n\n生产推荐：bridge（默认）",
-    "detail": "### 各模式对比\n\n  bridge：docker0 → 每个容器有独立 IP\n    ✅ 默认，安全隔离\n    ❌ 端口需要 -p 映射\n\n  host：容器直接使用宿主机网络\n    ✅ 性能好，无 NAT 损耗\n    ❌ 端口冲突风险，无隔离\n\n  none：完全隔离\n    用于特殊场景（纯计算）\n\n  container：和另一个容器共享网络\n    用于 Sidecar 模式\n\n### 排障命令\n\n  # 看容器的网络模式\n  docker inspect <container> | grep NetworkMode\n\n  # 看 bridge 网络\n  docker network ls\n  docker network inspect bridge\n\n  # 自定义网络（推荐）\n  docker network create mynet\n  docker run --network mynet ..."
+    "cat": "k8s",
+    "title": "如何实现应用的零停机升级？",
+    "core": "**答案：**\n使用滚动更新策略：\napiVersion: apps/v1\nkind: Deployment\nmetadata:\nname: my-app",
+    "detail": "**答案：**\n使用滚动更新策略：\n\n```yaml\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: my-app\nspec:\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1        # 最大额外Pod数\n      maxUnavailable: 0  # 最大不可用Pod数\n  template:\n    spec:\n      containers:\n      - name: app\n        image: my-app:v2\n        readinessProbe:    # 就绪探针确保新Pod完全启动\n          httpGet:\n            path: /health\n            port: 8080\n          initialDelaySeconds: 10\n          periodSeconds: 5\n```"
   },
   {
     "id": 17,
-    "cat": "docker",
-    "title": "容器日志太大怎么办？怎么配置日志轮转？",
-    "core": "默认不限制日志大小，长期运行可能占满磁盘。\n\n启动时限制：\n  docker run --log-opt max-size=10m --log-opt max-file=3\n\n全局配置：修改 daemon.json",
-    "detail": "### 配置方法\n\n  # /etc/docker/daemon.json\n  {\n    \"log-driver\": \"json-file\",\n    \"log-opts\": {\n      \"max-size\": \"10m\",\n      \"max-file\": \"3\"\n    }\n  }\n\n  systemctl restart docker\n\n### 清理现有日志\n\n  # 查看哪些容器日志大\n  du -sh /var/lib/docker/containers/*/*-json.log\n\n  # 清空日志（不重启容器）\n  truncate -s 0 /var/lib/docker/containers/<id>/*-json.log\n\n  # 或一键清理\n  docker system prune -f          # 清理未用资源\n  docker system df                # 看 Docker 占了多少\n\n### 推荐配置\n\n  生产环境建议：\n  max-size=10m    # 每个日志文件 10MB\n  max-file=3      # 保留最近 3 个\n\n  或使用其他日志驱动：\n  syslog / fluentd / gelf / awslogs"
+    "cat": "middleware",
+    "title": "简单说说你是如何搭建canal集群的？",
+    "core": "Canal 集群围绕「MySQL→ES 实时数据同步」构建，采用分层架构 + 分布式协调模式，核心组件包括 **ZooKeeper、Canal Admin、Canal Deployer、Canal Adapter**，配合 Kafka 实现解耦，整体架构分为 5 层：\n+ 数据采集层：MySQL（源数据库，通过 binlog 记录数据变更）；\n+ 核心服务层：Canal Deployer 集群（核心，负责捕获 MySQL 变更）；\n+ 消息缓冲层：Kafka（解耦生产者与消费者，缓冲数据）；\n+ 数据转换层：Canal Adapter 集群（消费 Kafka 消息，转换为 ES 可识别格式）；",
+    "detail": "Canal 集群围绕「MySQL→ES 实时数据同步」构建，采用分层架构 + 分布式协调模式，核心组件包括 **ZooKeeper、Canal Admin、Canal Deployer、Canal Adapter**，配合 Kafka 实现解耦，整体架构分为 5 层：\n\n+ 数据采集层：MySQL（源数据库，通过 binlog 记录数据变更）；\n+ 核心服务层：Canal Deployer 集群（核心，负责捕获 MySQL 变更）；\n+ 消息缓冲层：Kafka（解耦生产者与消费者，缓冲数据）；\n+ 数据转换层：Canal Adapter 集群（消费 Kafka 消息，转换为 ES 可识别格式）；\n+ 管理协调层：Canal Admin（可视化管理）+ ZooKeeper（分布式协调，保障高可用）\n\n```sh\nZooKeeper：作为集群 “大脑”，存储 Canal 集群元数据、binlog 消费位点、实例运行状态，实现 Deployer/Adapter 集群的高可用、负载均衡与故障转移；\nCanal Admin：可视化集群管控中心，统一管理 Deployer 节点、配置实例、监控运行状态，无需手动逐节点配置；\nCanal Deployer：核心数据捕获节点（多节点集群部署），伪装成 MySQL 从库，拉取并解析 binlog，过滤数据后推送至 Kafka 指定 Topic；\nCanal Adapter：数据转换节点（多节点集群部署），从 Kafka 消费消息，通过配置的yml映射规则转换数据，批量写入 Elasticsearch，首次需手动触发全量同步；\nKafka：消息中间件，接收 Deployer 推送的变更消息，为 Adapter 提供可回溯、高可靠的消息来源，避免单点依赖。\n```"
   },
   {
     "id": 18,
-    "cat": "docker",
-    "title": "docker-compose 和 docker stack 的区别？",
-    "core": "docker-compose — 单机编排，开发测试常用\ndocker stack — Swarm 集群编排，生产部署\n\n本质区别：compose 只在一台机器上",
-    "detail": "### docker-compose.yml 示例\n\n  version: '3.8'\n  services:\n    web:\n      image: nginx\n      ports:\n        - \"80:80\"\n    db:\n      image: mysql:8\n      environment:\n        MYSQL_ROOT_PASSWORD: rootpass\n      volumes:\n        - db_data:/var/lib/mysql\n  volumes:\n    db_data:\n\n### 常用命令\n\n  # 启动\n  docker-compose up -d\n\n  # 看日志\n  docker-compose logs -f web\n\n  # 重新构建并启动\n  docker-compose up -d --build\n\n  # 停止并清理\n  docker-compose down -v\n\n### 生产用啥？\n\n  单机测试 → docker-compose\n  多机部署 → K8s（推荐）或 Docker Swarm\n\n  Compose 适合本地开发和 CI 环境\n  生产环境还是上 K8s"
+    "cat": "middleware",
+    "title": "Elasticsearch 集群有哪些节点？",
+    "core": "我搭建的 Elasticsearch 8.13.2 集群，采用 3 节点高可用架构，每台节点均为「Master + Data + Ingest」复合角色，既承担主节点的选举、集群管理职责，也承担数据节点的数据存储、查询职责，同时具备预处理节点的文档解析能力。\n+ **Master 节点（主节点）**：负责集群层面的管理决策和状态维护，**不直接处理用户的数据读写请求**，一个集群中只有一个活跃主节点。\n+ **Data 节点（数据节点）**：**存储数据**并**执行数据相关的操作**（搜索、聚合、文档读写），消耗大量磁盘 I/O、内存和 CPU，是集群中最“重”的节点。",
+    "detail": "我搭建的 Elasticsearch 8.13.2 集群，采用 3 节点高可用架构，每台节点均为「Master + Data + Ingest」复合角色，既承担主节点的选举、集群管理职责，也承担数据节点的数据存储、查询职责，同时具备预处理节点的文档解析能力。\n\n+ **Master 节点（主节点）**：负责集群层面的管理决策和状态维护，**不直接处理用户的数据读写请求**，一个集群中只有一个活跃主节点。\n+ **Data 节点（数据节点）**：**存储数据**并**执行数据相关的操作**（搜索、聚合、文档读写），消耗大量磁盘 I/O、内存和 CPU，是集群中最“重”的节点。\n+  **Ingest 节点（预处理节点）**：在**索引文档之前**对文档进行预处理（类似 ETL 管道），日志系统解析nginx日志、数据清晰。\n\n之所以采用复合角色，是因为集群规模适中（3节点），复合角色可简化部署和运维，同时满足生产环境的高可用和性能需求；若后续集群扩容，会考虑拆分独立的主节点、数据节点和协调节点，进一步优化性能。"
   },
   {
     "id": 19,
-    "cat": "docker",
-    "title": "容器内怎么调试？没有 bash 怎么办？",
-    "core": "# 进入容器\ndocker exec -it <container> sh\ndocker exec -it <container> bash\n\n# 容器没 bash（Alpine）\ndocker exec -it <container> /bin/sh\n\n# 实在啥都没有\ndocker cp debug-tool <container>:/tmp/\ndocker exec <container> /tmp/debug-tool",
-    "detail": "### 实用调试技巧\n\n  # 1. 看进程\n  docker top <container>\n\n  # 2. 看资源使用\n  docker stats <container>\n\n  # 3. 在宿主机上查看容器进程\n  ps aux | grep <container-name>\n\n  # 4. 用 nsenter 进入命名空间\n  docker inspect <container> | grep Pid\n  nsenter -t <pid> -n -m -p\n\n  # 5. 拷贝文件出来\n  docker cp <container>:/var/log/app.log ./\n\n### 调试场景\n\n  Alpine 容器没有 bash 和 curl：\n  docker exec -it alpine sh\n  apk add curl\n\n  或者用 busybox 临时调试：\n  docker run -it --network container:<target> busybox sh"
+    "cat": "middleware",
+    "title": "你搭建的es集群，jvm堆内存怎么设置的？",
+    "core": "我们服务器内存是64G, JVM 堆内存设置为 31G（不超过物理内存的 50%，且不超过 32G）,同时采用 G1GC 垃圾回收器，适配大内存场景。\n#修改jvm.options\n# JVM 堆内存初始值\n-Xms31g\n# JVM 堆内存最大值\n-Xmx31g",
+    "detail": "我们服务器内存是64G, JVM 堆内存设置为 31G（不超过物理内存的 50%，且不超过 32G）,同时采用 G1GC 垃圾回收器，适配大内存场景。\n\n```sh\n#修改jvm.options\n# JVM 堆内存初始值\n-Xms31g\n# JVM 堆内存最大值\n-Xmx31g\n# 垃圾回收器配置（G1GC，适合大内存场景）\n-XX:+UseG1GC\n# 堆内存溢出时生成 dump 文件\n-XX:+HeapDumpOnOutOfMemoryError\n# dump 文件存放路径（部署路径下的 logs 子目录）\n-XX:HeapDumpPath=/data/software/elasticsearch/logs/heapdump.hprof\n```"
   },
   {
     "id": 20,
-    "cat": "ops",
-    "title": "证书过期导致集群崩溃的完整处理过程？",
-    "core": "症状：kubectl 报 x509 证书过期\n  kubectl 连不上集群\n  Node 状态 NotReady\n\n检查：kubeadm certs check-expiration\n修复：kubeadm certs renew all + 重启组件",
-    "detail": "### 真实案例\n\n  某天早上收到告警：\n  - kubectl 连不上集群\n  - 所有 Node 显示 NotReady\n  - 但已有服务还能访问（kubelet 在用旧证书？）\n\n  排查过程：\n  # 1. 直接 curl apiserver\n  curl -k https://localhost:6443/healthz  # OK，apiserver 还在\n\n  # 2. 检查证书\n  kubeadm certs check-expiration\n  # 发现所有证书 3 天前就过期了！\n\n  # 3. 续期\n  kubeadm certs renew all\n\n  # 4. 重启相关组件\n  systemctl restart kubelet\n  # 如果 apiserver 也需要重启\n  # 用 docker ps 找到容器，docker restart\n\n  # 5. 验证\n  kubectl get nodes  # 恢复了\n\n### 经验总结\n\n  • 证书有效期默认 1 年，一定要监控\n  • 写个 crontab 每月检查一次\n  • 或用 cert-manager 自动管理\n\n### 监控脚本\n\n  #!/bin/bash\n  kubeadm certs check-expiration | grep -E 'EXPIRED|expired' &&     echo \"证书要过期了！\" | mail -s \"证书告警\" admin@example.com"
+    "cat": "middleware",
+    "title": "你的集群开启了安全配置吗？具体做了哪些安全措施？",
+    "core": "+  开启 SSL/TLS 加密：使用 ES 自带的 elasticsearch-certutil 工具，生成自签名 CA 证书和节点证书，所有节点间的通信（transport 端口 19300）均通过 SSL 加密，开启证书验证和客户端认证，防止集群内部通信被窃取或篡改；\n+ 开启用户名密码认证：ES 8.x 默认开启安全认证，我通过 elasticsearch-setup-passwords 命令，为 elastic（超级管理员）、kibana_system（Kibana 专用）、logstash_system 等内置用户设置了强密码（大小写+数字+特殊符号），后续客户端（Canal、Kibana）连接 ES 时，必须通过账号密码验证，避免未授权访问；",
+    "detail": "+  开启 SSL/TLS 加密：使用 ES 自带的 elasticsearch-certutil 工具，生成自签名 CA 证书和节点证书，所有节点间的通信（transport 端口 19300）均通过 SSL 加密，开启证书验证和客户端认证，防止集群内部通信被窃取或篡改；\n+ 开启用户名密码认证：ES 8.x 默认开启安全认证，我通过 elasticsearch-setup-passwords 命令，为 elastic（超级管理员）、kibana_system（Kibana 专用）、logstash_system 等内置用户设置了强密码（大小写+数字+特殊符号），后续客户端（Canal、Kibana）连接 ES 时，必须通过账号密码验证，避免未授权访问；\n+ 配置跨域限制：开启 HTTP 跨域支持，允许 Kibana 等客户端访问，但限制了允许的请求头（Authorization、Content-Type），避免跨域攻击，同时绑定具体节点 IP（而非 0.0.0.0），减少监听范围，提升安全性。"
   },
   {
     "id": 21,
-    "cat": "ops",
-    "title": "/var/log 写满导致服务不可用，怎么快速处理？",
-    "core": "# 紧急处理\ntruncate -s 0 /var/log/syslog     # 清空但不删文件\njournalctl --vacuum-size=100M     # 限制 journal 大小\nfind /var/log -name \"*.log\" -delete 2>/dev/null\n\n# 根治\n配置 logrotate，限制日志大小和保留天数",
-    "detail": "### 真实案例\n\n  某次告警：Nginx 502，MySQL 连不上\n  排查：\n  # df -h 发现 /var 使用率 100%\n\n  # 找大文件\n  du -sh /var/log/* | sort -rh | head -5\n  # syslog 50GB！Nginx access.log 30GB\n\n  # 紧急处理\n  truncate -s 0 /var/log/syslog\n  truncate -s 0 /var/log/nginx/access.log\n\n  # 服务立刻恢复\n\n  # 配置 logrotate\n  cat > /etc/logrotate.d/nginx << 'EOF'\n  /var/log/nginx/*.log {\n      daily\n      rotate 7\n      compress\n      delaycompress\n      missingok\n      notifempty\n      postrotate\n          [ -f /var/run/nginx.pid ] && kill -USR1 \\`cat /var/run/nginx.pid\\`\n      endscript\n  }\n  EOF\n\n### 经验总结\n\n  • 所有日志服务配 logrotate（默认可能没配）\n  • 监控磁盘使用率，80% 就告警\n  • find / -type f -size +100M 定期扫大文件"
+    "cat": "middleware",
+    "title": "集群的分片和副本是怎么规划的？为什么这么规划？",
+    "core": "分片和副本的规划，是结合业务数据量和高可用需求来的。**将分片大小规划在 30GB-50GB 是比较稳妥的选择**\n+ 分片规划：每个索引主分片设为5个（3节点集群，符合分片数不超过节点数2倍的要求），避免单分片过大影响性能；同时配置cluster.max_shards_per_node: 1000，限制单节点分片数，防止资源占用过量。\n+ 副本规划：副本因子为1，3节点可实现副本均匀分布，既保障数据冗余、避免节点故障导致数据丢失，又不会因副本过多增加资源负担和同步压力。\n补充：后续数据量增长时，将通过扩容节点、ILM调整分片数，避免分片集中。",
+    "detail": "分片和副本的规划，是结合业务数据量和高可用需求来的。**将分片大小规划在 30GB-50GB 是比较稳妥的选择**\n\n+ 分片规划：每个索引主分片设为5个（3节点集群，符合分片数不超过节点数2倍的要求），避免单分片过大影响性能；同时配置cluster.max_shards_per_node: 1000，限制单节点分片数，防止资源占用过量。\n+ 副本规划：副本因子为1，3节点可实现副本均匀分布，既保障数据冗余、避免节点故障导致数据丢失，又不会因副本过多增加资源负担和同步压力。\n\n补充：后续数据量增长时，将通过扩容节点、ILM调整分片数，避免分片集中。"
   },
   {
     "id": 22,
-    "cat": "ops",
-    "title": "误删了数据库文件怎么办？恢复流程？",
-    "core": "# 先停止所有写入\nsystemctl stop mysql\n\n# 如果 lsof 还持有文件描述符\n# 从 /proc 恢复\ncp /proc/<pid>/fd/<fd-number> /restore/db.sql\n\n# 再从备份还原\n# 没有备份 → 找专业数据恢复公司",
-    "detail": "### 应急流程\n\n  # 1. 立刻停止所有写操作\n  systemctl stop mysql\n  # 或\n  kill -STOP <mysql-pid>     # 暂停进程\n\n  # 2. 检查是否还能恢复\n  # 如果文件被删除但进程没重启\n  lsof | grep deleted         # 看有哪些被删但还在用的文件\n  # MySQL 的 ibd 文件如果还在 fd 里\n  ls -la /proc/<mysql-pid>/fd/ | grep deleted\n  cp /proc/<pid>/fd/3 /restore/db.sql\n\n  # 3. 从备份恢复\n  # 有 mysqldump：直接导入\n  mysql -u root -p < backup.sql\n\n  # 有 xtrabackup：\n  xtrabackup --prepare --target-dir=/backup/mysql\n  systemctl stop mysql\n  rm -rf /var/lib/mysql/*\n  xtrabackup --copy-back --target-dir=/backup/mysql\n  chown -R mysql:mysql /var/lib/mysql\n  systemctl start mysql\n\n### 血的教训\n\n  • 定期备份！定期备份！定期备份！\n  • 备份后定期演练恢复\n  • 不要 rm -rf，用 mv 到临时目录\n  • 生产环境配回收站或快照"
+    "cat": "middleware",
+    "title": "你们kafka集群怎么搭建的",
+    "core": "我们Kafka 4.1.1 版本的3节点架构，保证高可用，避免单点故障。 **默认启用 KRaft 模式，彻底去除 ZooKeeper 依赖**，新增kraft核心配置实现高可用\n############################# KRaft 核心配置 #############################\nprocess.roles=broker,controller\n# 【关键】每个节点唯一：node-1=1, node-2=2, node-3=3\nnode.id=1\n# 【关键】所有节点必须完全一致！列出所有Controller节点",
+    "detail": "我们Kafka 4.1.1 版本的3节点架构，保证高可用，避免单点故障。 **默认启用 KRaft 模式，彻底去除 ZooKeeper 依赖**，新增kraft核心配置实现高可用\n\n```sh\n############################# KRaft 核心配置 #############################\nprocess.roles=broker,controller\n# 【关键】每个节点唯一：node-1=1, node-2=2, node-3=3\nnode.id=1\n# 【关键】所有节点必须完全一致！列出所有Controller节点\ncontroller.quorum.voters=1@kafka-node-01:9093,2@kafka-node-02:9093,3@kafka-node-03:9093\ncontroller.listener.names=CONTROLLER\n```"
   },
   {
     "id": 23,
-    "cat": "ops",
-    "title": "K8s 节点 NotReady，但远程连不上节点怎么处理？",
-    "core": "# 如果完全连不上节点\n# 强制驱逐 Pod\nkubectl drain node1 --ignore-daemonsets --delete-emptydir-data\n\n# 如果节点永远回不来\nkubectl delete node node1\n\n# 新节点加入\nkubeadm join ...",
-    "detail": "### 真实排障\n\n  客户反馈：集群有节点 NotReady，但机房不让 SSH\n\n  处理步骤：\n  # 1. 检查节点详情\n  kubectl describe node node1\n  # 看到最后心跳是 2 小时前\n\n  # 2. 等 5 分钟后自动驱逐\n  # K8s 默认 40s 标记 Unknown，5 分钟开始驱逐\n\n  # 3. 手动强制驱逐\n  kubectl drain node1 --ignore-daemonsets --force --delete-emptydir-data\n\n  # 4. 节点恢复后重新加入\n  # 节点修复后\n  kubectl uncordon node1\n\n  # 或完全移除重建\n  kubectl delete node node1\n  # 在节点上重新 join\n\n### 经验\n\n  • PodDisruptionBudget 保证服务不中断\n  • 重要服务至少 2 副本并配反亲和性\n  • 节点故障时 PDB 能阻止全杀"
+    "cat": "middleware",
+    "title": "KRaft 模式中，Controller 和 Broker 的角色分别是什么？",
+    "core": "+ Controller（控制器）：集群的 “大脑”，负责管理集群元数据（如 Topic 配置、分区 Leader 选举、节点状态），协调所有 Broker 节点，确保集群一致性；\n+ Broker（代理）：集群的 “数据节点”，负责接收生产者消息、存储消息、处理消费者请求，同时参与副本同步和 Leader 选举；\n+ 副本因子（Replication Factor）：指定每个 Topic 分区的副本数量，副本分布在不同 Broker 节点，用于实现高可用；\n+ 最小同步副本（MinISR）：确保消息被写入至少 N 个副本后，才返回给生产者 “消息发送成功”，用于保证数据持久化；",
+    "detail": "+ Controller（控制器）：集群的 “大脑”，负责管理集群元数据（如 Topic 配置、分区 Leader 选举、节点状态），协调所有 Broker 节点，确保集群一致性；\n+ Broker（代理）：集群的 “数据节点”，负责接收生产者消息、存储消息、处理消费者请求，同时参与副本同步和 Leader 选举；\n+ 副本因子（Replication Factor）：指定每个 Topic 分区的副本数量，副本分布在不同 Broker 节点，用于实现高可用；\n+ 最小同步副本（MinISR）：确保消息被写入至少 N 个副本后，才返回给生产者 “消息发送成功”，用于保证数据持久化；"
   },
   {
     "id": 24,
-    "cat": "tool",
-    "title": "Prometheus + Grafana 监控栈怎么搭？",
-    "core": "最流行的开源监控方案。\n\nPrometheus — 采集和存储指标\nGrafana — 可视化仪表盘\nAlertmanager — 告警通知",
-    "detail": "### 架构\n\n  被监控目标 → Exporters → Prometheus → Grafana\n                                        → Alertmanager → 钉钉/邮件\n\n### 快速部署（Docker Compose）\n\n  services:\n    prometheus:\n      image: prom/prometheus\n      volumes:\n        - ./prometheus.yml:/etc/prometheus/prometheus.yml\n      ports:\n        - \"9090:9090\"\n    grafana:\n      image: grafana/grafana\n      ports:\n        - \"3000:3000\"\n    node-exporter:\n      image: prom/node-exporter\n      ports:\n        - \"9100:9100\"\n\n### 常用 Exporters\n\n  node_exporter      — 系统指标（CPU/内存/磁盘）\n  blackbox_exporter  — 端口/HTTP 探测\n  mysqld_exporter    — MySQL 指标\n  nginx_exporter     — Nginx 指标\n  cadvisor           — 容器指标（已内置到 K8s）\n\n### 推荐告警规则\n\n  - CPU > 80%\n  - 内存 > 90%\n  - 磁盘 > 85%\n  - Node NotReady\n  - Pod CrashLoopBackOff"
+    "cat": "middleware",
+    "title": "生产环境部署 Kafka 时，如何确保节点间通信正常？关键配置有哪些？",
+    "core": "核心是 **配置主机名解析和正确的监听器**\n+ 主机名配置：每个节点设置唯一主机名（如 kafka-node-01），并在所有节点 `/etc/hosts` 中添加所有节点的 IP + 主机名映射，避免依赖 DNS；\n+ 监听器配置\n############################# 网络监听器 #############################\n# 外部客户端访问端口 (9092) 和 Controller内部通信端口 (9093)\nlisteners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093",
+    "detail": "核心是 **配置主机名解析和正确的监听器**\n\n+ 主机名配置：每个节点设置唯一主机名（如 kafka-node-01），并在所有节点 `/etc/hosts` 中添加所有节点的 IP + 主机名映射，避免依赖 DNS；\n+ 监听器配置\n\n```sh\n############################# 网络监听器 #############################\n# 外部客户端访问端口 (9092) 和 Controller内部通信端口 (9093)\nlisteners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093\ninter.broker.listener.name=SASL_PLAINTEXT\n# 【关键】各节点需改为自己的主机名/IP\nadvertised.listeners=SASL_PLAINTEXT://kafka-node-01:9092\nlistener.security.protocol.map=CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT\n```"
   },
   {
     "id": 25,
-    "cat": "tool",
-    "title": "ansible 和 saltstack 的区别？什么时候用？",
-    "core": "Ansible — 推模式，走 SSH，无需 agent\nSaltStack — 推/拉都行，需要 agent\n\n小规模（<100 台）：Ansible（简单）\n大规模（>100 台）：SaltStack（快速）",
-    "detail": "### Ansible 示例\n\n  # 一键部署 Nginx\n  - hosts: webservers\n    tasks:\n    - name: Install nginx\n      apt:\n        name: nginx\n        state: present\n    - name: Start nginx\n      service:\n        name: nginx\n        state: started\n\n  # 执行\n  ansible-playbook -i hosts deploy.yml\n\n### 什么时候选哪个\n\n  Ansible 适合：\n  - 几十台机器\n  - 不想装 agent\n  - 需要快速上手\n  - 网络设备配置（很多厂商支持 Ansible）\n\n  SaltStack 适合：\n  - 几百上千台机器\n  - 需要实时执行\n  - 配置管理 + 远程执行\n  - 需要 event-driven 自动化\n\n### 其他工具\n\n  Puppet — 老牌，声明式，复杂但成熟\n  Chef — Ruby DSL，生态不错\n  Terraform — IaC，管基础设施\n  Pulumi — 用编程语言写 IaC"
+    "cat": "middleware",
+    "title": "消费组出现消息积压（LAG>0），可能的原因有哪些？如何解决？",
+    "core": "+ 消费者侧：消费者消费速度过慢（如业务逻辑复杂或单线程消费），消费组数量不足。优化消费者业务逻辑、增加消费者数量（不超过topic分区数）、开启多线程消费。\n+ 集群侧：kafka集群io性能不足、网络延迟高，导致消息生成速率大于消费者速率。优化kafka集群参数（增加io线程、调整网络缓冲区）、检查磁盘id性能。\n+ 配置：topic分区数过少，导致消费者并行度不足。扩容分区数，但需要注意扩容后不能缩容。",
+    "detail": "+ 消费者侧：消费者消费速度过慢（如业务逻辑复杂或单线程消费），消费组数量不足。优化消费者业务逻辑、增加消费者数量（不超过topic分区数）、开启多线程消费。\n+ 集群侧：kafka集群io性能不足、网络延迟高，导致消息生成速率大于消费者速率。优化kafka集群参数（增加io线程、调整网络缓冲区）、检查磁盘id性能。\n+ 配置：topic分区数过少，导致消费者并行度不足。扩容分区数，但需要注意扩容后不能缩容。"
   },
   {
     "id": 26,
-    "cat": "tool",
-    "title": "GitHub Actions 和 GitLab CI 的核心区别？",
-    "core": "GitHub Actions — 和 GitHub 深度集成，社区 Action 丰富\nGitLab CI — 自带 Docker Registry，适合自建\n\n核心区别：GitHub 在云端，GitLab 可以自托管",
-    "detail": "### GitHub Actions 示例\n\n  name: Deploy\n  on:\n    push:\n      branches: [main]\n  jobs:\n    deploy:\n      runs-on: ubuntu-latest\n      steps:\n      - uses: actions/checkout@v4\n      - name: Build Docker image\n        run: docker build -t myapp .\n      - name: Deploy to K8s\n        run: kubectl apply -f k8s/deploy.yaml\n\n### GitLab CI 示例\n\n  stages:\n    - build\n    - test\n    - deploy\n\n  build:\n    stage: build\n    script:\n      - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .\n      - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA\n\n### 选型建议\n\n  GitHub Actions 推荐：\n  - 代码在 GitHub\n  - 需要丰富的社区 Action\n  - 不需要自建 Runner\n\n  GitLab CI 推荐：\n  - 需要自建（内网部署）\n  - 需要内置的 Container Registry\n  - 需要更细粒度的权限控制"
+    "cat": "middleware",
+    "title": "生产环境 Kafka 性能调优，从哪些层面入手？关键参数有哪些？",
+    "core": "+ 操作系统层面：调整内核参数以及文件句柄限制\n# 调整内核参数\n[root@kafka-node-01 kafka_4.1.1]#  tee -a /etc/sysctl.conf << EOF\nnet.core.rmem_max=16777216  #调整网络缓冲区最大为16M 接收缓冲区\nnet.core.wmem_max=16777216  #调整网络缓冲区最大为16M  发送缓冲区\nnet.ipv4.tcp_rmem=4096 87380 16777216",
+    "detail": "+ 操作系统层面：调整内核参数以及文件句柄限制\n\n```sh\n# 调整内核参数\n[root@kafka-node-01 kafka_4.1.1]#  tee -a /etc/sysctl.conf << EOF\nnet.core.rmem_max=16777216  #调整网络缓冲区最大为16M 接收缓冲区\nnet.core.wmem_max=16777216  #调整网络缓冲区最大为16M  发送缓冲区\nnet.ipv4.tcp_rmem=4096 87380 16777216\nnet.ipv4.tcp_wmem=4096 65536 16777216\nvm.swappiness=1             #禁用swap交换分区，避免内存交换影响性能\nEOF\n[root@kafka-node-01 kafka_4.1.1]#  sysctl -p\n\n# 调整文件句柄限制\n#将所有软硬文件软硬句柄限制设置为655350，每个进程可以同时打开的最大文件数为655350\n[root@kafka-node-01 kafka_4.1.1]# vim /etc/security/limits.conf\n* soft nofile 655350\n* hard nofile 655350\n```\n\n+ kafka层面：调整 Kafka 的关键配置参数，优化网络处理、数据复制、日志保留等方面的性能，以适应生产环境的高负载需求。\n\n```sh\n[worker@kafka-node-01 ~]$ cd /data/software/kafka_4.1.1/config/\n[worker@kafka-node-01 config]$ vim server.properties\n# 网络与IO性能\n#网络线程池大小\nnum.network.threads=8\n#IO 线程池大小，其数量通常配置为 CPU 核心数的 1.5 到 2 倍左右\nnum.io.threads=16\n#TCP 发送缓冲区大小 (SO_SNDBUF)  约 1 MB\nsocket.send.buffer.bytes=1024000\n#TCP 接收缓冲区大小 (SO_RCVBUF)  约 1 MB\nsocket.receive.buffer.bytes=1024000\n\n# 复制与可用性\n#是否允许“非同步”副本当选 Leader\nunclean.leader.election.enable=false\n#副本滞后最大超时时间   30s\nreplica.lag.time.max.ms=30000\n\n# 日志保留策略\n#基于时间的日志保留策略 7天\nlog.retention.hours=168\n#基于分区大小的日志保留策略\n#Kafka 会保证单个分区的日志文件总大小不超过 10 GB，超出部分会被删除\nlog.retention.bytes=10737418240\n```"
   },
   {
     "id": 27,
-    "cat": "tool",
-    "title": "日志收集 ELK vs Loki 怎么选？",
-    "core": "ELK（Elasticsearch + Logstash + Kibana）\n  • 全文搜索强\n  • 资源消耗大\n  • 适合需要复杂查询\n\nLoki（Loki + Promtail + Grafana）\n  • 轻量，和 Prometheus 共用 Grafana\n  • 不索引内容，只索引标签\n  • 适合 K8s 环境",
-    "detail": "### 核心区别\n\n  ELK：先索引日志内容，再存储\n  Loki：先存日志，不索引内容（只索引标签）\n\n  ELK 适合：需要全文搜索、复杂聚合分析\n  Loki 适合：K8s 容器日志、简单检索、和 Prometheus 共用\n\n### 部署复杂度\n\n  ELK 栈：\n  - Elasticsearch（3 节点集群，吃内存）\n  - Logstash（要写 filter 配置）\n  - Kibana\n  - Filebeat（采集端）\n  → 最少 8GB 内存起步\n\n  Loki 栈：\n  - Loki（单二进制，很轻）\n  - Promtail（采集端）\n  - Grafana（Web UI，和监控共用）\n  → 512MB 内存就够\n\n### 我的建议\n\n  K8s 环境 → Loki（轻量，原生对接 K8s）\n  传统架构 → ELK（搜索强大）\n  预算有限 → Loki\n  需要合规审计 → ELK"
+    "cat": "k8s",
+    "title": "当发现某个节点NotReady时，你的排查思路是什么？",
+    "core": "**答案：**\n# 1. 检查节点状态\nkubectl get nodes\nkubectl describe node <node-name>\n# 2. SSH登录节点检查系统状态\nssh <node-ip>",
+    "detail": "**答案：**\n```bash\n# 1. 检查节点状态\nkubectl get nodes\nkubectl describe node <node-name>\n\n# 2. SSH登录节点检查系统状态\nssh <node-ip>\nsystemctl status kubelet\njournalctl -u kubelet -f\n\n# 3. 检查系统资源\ndf -h          # 磁盘空间\nfree -m        # 内存使用\ntop            # CPU负载\n\n# 4. 检查网络连接\nping <master-ip>\ntelnet <master-ip> 6443\n\n# 5. 检查容器运行时\ndocker ps      # 或 crictl ps\nsystemctl status docker/containerd\n\n# 6. 检查证书有效期\nopenssl x509 -in /etc/kubernetes/pki/apiserver.crt -noout -dates\n```"
   },
   {
     "id": 28,
-    "cat": "tool",
-    "title": "运维必备的 CLI 工具有哪些？",
-    "core": "网络：curl / wget / ss / tcpdump / mtr\n系统：top / htop / iostat / sar / strace\n磁盘：df / du / iotop / ncdu\n容器：docker / crictl / kubectl\n其他：jq / yq / fzf / ripgrep",
-    "detail": "### 按场景推荐\n\n  **日常排查**\n  htop        → 比 top 好看100倍\n  ncdu        → 磁盘空间交互式分析\n  lsof        → 看进程打开了哪些文件\n  strace      → 看进程在干什么\n\n  **文本处理**\n  jq          → JSON 解析器（kubectl 输出必用）\n  ripgrep(rg) → 比 grep 快 10 倍\n  fzf         → 模糊搜索，历史命令神器\n\n  **网络调试**\n  mtr         → traceroute + ping 合体\n  tcpdump     → 抓包分析\n  ngrep       → 网络版 grep\n\n  **K8s 相关**\n  kubectl     → 核心\n  k9s         → 终端版 K8s UI\n  kubectx     → 快速切换集群\n\n### 安装建议\n\n  这些工具都不用装，就用 Docker 跑：\n  alias jq='docker run --rm -i stedolan/jq'\n  alias yq='docker run --rm -i mikefarah/yq'"
+    "cat": "k8s",
+    "title": "Pod频繁重启(OOMKilled)如何处理？",
+    "core": "**答案：**\n# 1. 确认OOM原因\nkubectl get pod <pod-name> -o yaml | grep -A 5 lastState\n# 2. 调整资源限制\nresources:\nrequests:",
+    "detail": "**答案：**\n\n```bash\n# 1. 确认OOM原因\nkubectl get pod <pod-name> -o yaml | grep -A 5 lastState\n\n# 2. 调整资源限制\nresources:\n  requests:\n    memory: \"512Mi\"\n  limits:\n    memory: \"1Gi\"\n\n# 3. 优化应用内存使用\n# - 检查内存泄漏\n# - 调整JVM堆大小(Java应用)\n# - 优化缓存策略\n\n# 4. 监控内存趋势\nkubectl top pod <pod-name> --containers\n```"
   },
   {
     "id": 29,
-    "cat": "tool",
-    "title": "Terraform 是什么？怎么管理已有资源？",
-    "core": "Terraform = Infrastructure as Code（IaC）\n用代码管理云资源（服务器、网络、DNS 等）\n\n核心概念：\n• main.tf — 资源定义\n• terraform plan — 预览变更\n• terraform apply — 执行变更\n• terraform state — 状态文件",
-    "detail": "### 管理已有资源\n\n  # 1. 写配置\n  resource \"aws_instance\" \"web\" {\n    ami = \"ami-xxx\"\n    instance_type = \"t3.micro\"\n  }\n\n  # 2. 导入已有资源\n  terraform import aws_instance.web i-123456\n\n  # 3. 正常管理\n  terraform plan    # 看看有什么差异\n  terraform apply   # 同步状态\n\n### 核心概念\n\n  State — 记录当前实际状态\n  保存在本地 terraform.tfstate 或远程（S3/Consul）\n\n  Plan — 对比 state 和配置，显示差异\n  Apply — 执行变更，更新 state\n\n### 跨云管理\n\n  provider \"aws\" {\n    region = \"ap-northeast-1\"\n  }\n  provider \"alicloud\" {\n    region = \"cn-beijing\"\n  }\n\n  一个 Terraform 同时管阿里云和 AWS"
+    "cat": "k8s",
+    "title": "Linux性能调优",
+    "core": "# 内存相关\nvm.swappiness = 10\nvm.dirty_background_ratio = 10\nvm.dirty_ratio = 20\nvm.overcommit_memory = 2\n# 网络相关",
+    "detail": "```bash\n# 内存相关\nvm.swappiness = 10\nvm.dirty_background_ratio = 10\nvm.dirty_ratio = 20\nvm.overcommit_memory = 2\n\n# 网络相关\nnet.ipv4.tcp_max_syn_backlog = 1024\nnet.core.somaxconn = 1024\nnet.ipv4.tcp_tw_reuse = 1\nnet.ipv4.tcp_fin_timeout = 300\nnet.core.rmem_max = 16777216\nnet.core.wmem_max = 16777216\nnet.ipv4.tcp_syncookies = 1  # 开启SYN洪水防护\n\n# 文件句柄与进程\nfs.file-max = 655350\nkernel.pid_max = 65535\nkernel.threads-max = 65535\n```"
   },
   {
     "id": 30,
+    "cat": "k8s",
+    "title": "如何实现PersistentVolume的动态供给？",
+    "core": "# 1. 创建StorageClass\napiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\nname: fast-storage\nprovisioner: kubernetes.io/aws-ebs  # 根据云平台选择",
+    "detail": "```yaml\n# 1. 创建StorageClass\napiVersion: storage.k8s.io/v1\nkind: StorageClass\nmetadata:\n  name: fast-storage\nprovisioner: kubernetes.io/aws-ebs  # 根据云平台选择\nparameters:\n  type: gp2\n\n# 2. PVC自动绑定PV\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: my-pvc\nspec:\n  accessModes:\n    - ReadWriteOnce\n  storageClassName: fast-storage\n  resources:\n    requests:\n      storage: 10Gi\n```"
+  },
+  {
+    "id": 31,
+    "cat": "monitor",
+    "title": "请介绍 Kubernetes 集群的监控体系如何搭建？",
+    "core": "K8s集群监控体系搭建核心是“分层监控、全面覆盖、可观测闭环”，用主流工具栈实现采集、展示、告警全流程\n**架构组成：**\nPrometheus收集指标数据 + Grafana展示可视化图表 + Alertmanager发送告警\n1. 集群层：集群整体健康状态（API Server、etcd、Controller Manager、Scheduler四大核心组件的运行状态、可用性）、资源整体使用率（集群总CPU、内存、存储、网络吞吐）；\n2. 节点层：每个Node节点的CPU、内存、磁盘I/O、网络流量、进程状态、节点健康（是否Ready）、内核参数；",
+    "detail": "K8s集群监控体系搭建核心是“分层监控、全面覆盖、可观测闭环”，用主流工具栈实现采集、展示、告警全流程\n\n**架构组成：**\n\nPrometheus收集指标数据 + Grafana展示可视化图表 + Alertmanager发送告警\n\n```sh\n1. 集群层：集群整体健康状态（API Server、etcd、Controller Manager、Scheduler四大核心组件的运行状态、可用性）、资源整体使用率（集群总CPU、内存、存储、网络吞吐）；\n2. 节点层：每个Node节点的CPU、内存、磁盘I/O、网络流量、进程状态、节点健康（是否Ready）、内核参数；\n3. 容器层：容器的CPU使用率、内存占用、网络进出流量、磁盘读写、容器状态（Running/CrashLoopBackOff等）、容器镜像占用；\n4. 应用层：部署在集群内的业务应用（如微服务、数据库）的接口响应时间、请求量、错误率、业务指标（如订单量、并发数）。\n```\n\n**关键 Exporter：**\n\n- `kube-state-metrics`：K8s 资源对象状态（Pod 数量、Deployment 状态等）\n- `node-exporter`：节点层面指标（CPU、内存、磁盘、网络）\n- `cadvisor`：容器层面资源使用（内置在 kubelet 中）\n- `blackbox-exporter`：黑盒探测（HTTP/TCP/ICMP 可用性）\n\n**关键告警规则：**\n\nPrometheus Alertmanager（配置告警规则，接收Prometheus触发的告警）+ 告警渠道（邮件、企业微信、钉钉、Slack，确保告警及时触达运维/开发人员）。\n\n```sh\n# Pod 不可用\n- alert: PodNotReady\n  expr: kube_pod_status_ready{condition=\"true\"} == 0\n  for: 5m\n  \n# 节点内存使用率 > 90%\n- alert: NodeMemoryHigh\n  expr: (1 - node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes) > 0.9\n  for: 10m\n```"
+  },
+  {
+    "id": 32,
+    "cat": "monitor",
+    "title": "常见的Kubernetes监控方案有哪些？",
+    "core": "采用ELK/EFK主流技术栈，分4个核心环节：\n+ 采集层：Filebeat（轻量低耗），采集应用、系统、容器日志，分类采集不遗漏；\n+ 传输层：Kafka（高吞吐），缓解峰值压力，实现采集与存储解耦；\n+ 存储分析层：Elasticsearch，集中存储、分词检索，适配海量日志；\n+ 展示日志层：Kibana可视化。\n数据流走向: 源数据层(nginx,tomcat) ---> 数据采集(filebeat) ---> 数据缓存层(kafka)---> 转换层(Logstash) ---> 数据存储层(ElasticSearch)-->数据展示层(Kibana)",
+    "detail": "采用ELK/EFK主流技术栈，分4个核心环节：\n\n+ 采集层：Filebeat（轻量低耗），采集应用、系统、容器日志，分类采集不遗漏；\n+ 传输层：Kafka（高吞吐），缓解峰值压力，实现采集与存储解耦；\n+ 存储分析层：Elasticsearch，集中存储、分词检索，适配海量日志；\n+ 展示日志层：Kibana可视化。\n\n```sh\n数据流走向: 源数据层(nginx,tomcat) ---> 数据采集(filebeat) ---> 数据缓存层(kafka)---> 转换层(Logstash) ---> 数据存储层(ElasticSearch)-->数据展示层(Kibana)\n```"
+  },
+  {
+    "id": 33,
+    "cat": "monitor",
+    "title": "如何设置资源监控告警？",
+    "core": "# PrometheusRule示例\napiVersion: monitoring.coreos.com/v1\nkind: PrometheusRule\nmetadata:\nname: k8s-alerts\nspec:",
+    "detail": "```yaml\n# PrometheusRule示例\napiVersion: monitoring.coreos.com/v1\nkind: PrometheusRule\nmetadata:\n  name: k8s-alerts\nspec:\n  groups:\n  - name: k8s.rules\n    rules:\n    - alert: HighCPUUsage\n      expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8\n      for: 5m\n      labels:\n        severity: warning\n      annotations:\n        summary: \"CPU使用率过高\"\n        \n    - alert: PodCrashLooping\n      expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 0\n      for: 15m\n      labels:\n        severity: critical\n      annotations:\n        summary: \"Pod频繁重启\"\n```"
+  },
+  {
+    "id": 34,
+    "cat": "security",
+    "title": "Kubernetes中RBAC的作用是什么？如何配置？",
+    "core": "**答案：**\nRBAC(Role-Based Access Control)基于角色的访问控制：\n# 1. 创建Role\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:",
+    "detail": "**答案：**\nRBAC(Role-Based Access Control)基于角色的访问控制：\n\n```yaml\n# 1. 创建Role\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  namespace: default\n  name: pod-reader\nrules:\n- apiGroups: [\"\"]\n  resources: [\"pods\"]\n  verbs: [\"get\", \"watch\", \"list\"]\n\n# 2. 绑定Role到用户\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: read-pods\n  namespace: default\nsubjects:\n- kind: User\n  name: jane\n  apiGroup: rbac.authorization.k8s.io\nroleRef:\n  kind: Role\n  name: pod-reader\n  apiGroup: rbac.authorization.k8s.io\n```"
+  },
+  {
+    "id": 35,
+    "cat": "k8s",
+    "title": "什么是Helm？它在K8s中的作用？",
+    "core": "**答案：**\nHelm是Kubernetes的包管理工具：\n- **Chart**: Helm包，包含应用的所有K8s资源定义\n- **Release**: Chart的运行实例\n- **Repository**: Chart仓库\n# 常用命令",
+    "detail": "**答案：**\nHelm是Kubernetes的包管理工具：\n\n- **Chart**: Helm包，包含应用的所有K8s资源定义\n- **Release**: Chart的运行实例\n- **Repository**: Chart仓库\n\n```bash\n# 常用命令\nhelm install my-release ./my-chart\nhelm upgrade my-release ./my-chart\nhelm rollback my-release 1\nhelm list\n```"
+  },
+  {
+    "id": 36,
+    "cat": "k8s",
+    "title": "如何实现蓝绿部署或金丝雀发布？",
+    "core": "**答案：**\n**蓝绿部署：**\n# 同时运行两个版本，通过Service切换流量\napiVersion: v1\nkind: Service\nmetadata:",
+    "detail": "**答案：**\n**蓝绿部署：**\n```yaml\n# 同时运行两个版本，通过Service切换流量\napiVersion: v1\nkind: Service\nmetadata:\n  name: my-app\nspec:\n  selector:\n    version: blue  # 切换到green实现蓝绿切换\n  ports:\n  - port: 80\n```\n\n**金丝雀发布：**\n- 使用Istio等服务网格\n- 逐步增加新版本流量比例\n- 监控指标正常后全量切换"
+  },
+  {
+    "id": 37,
+    "cat": "linux",
+    "title": "如何排查Linux服务器CPU使用率100%的问题？",
+    "core": "**答案：**\n# 1. 定位高CPU进程\ntop -c\nhtop\n# 2. 查看具体线程\ntop -H -p <pid>",
+    "detail": "**答案：**\n```bash\n# 1. 定位高CPU进程\ntop -c\nhtop\n\n# 2. 查看具体线程\ntop -H -p <pid>\n\n# 3. 分析进程详情\nps aux | grep <process>\nstrace -p <pid>\n\n# 4. Java应用特殊处理\njstack <pid> > thread_dump.txt\njmap -heap <pid>\n\n# 5. 检查系统调用\nperf top\nvmstat 1 5\niostat -x 1 5\n```"
+  },
+  {
+    "id": 38,
+    "cat": "linux",
+    "title": "Linux中如何优化网络性能？",
+    "core": "**答案：**\n# 1. 调整内核参数\nsysctl -w net.core.somaxconn=65535\nsysctl -w net.ipv4.tcp_max_syn_backlog=65535\nsysctl -w net.core.netdev_max_backlog=5000\n# 2. 优化TCP参数",
+    "detail": "**答案：**\n```bash\n# 1. 调整内核参数\nsysctl -w net.core.somaxconn=65535\nsysctl -w net.ipv4.tcp_max_syn_backlog=65535\nsysctl -w net.core.netdev_max_backlog=5000\n\n# 2. 优化TCP参数\nsysctl -w net.ipv4.tcp_tw_reuse=1\nsysctl -w net.ipv4.tcp_fin_timeout=30\nsysctl -w net.ipv4.tcp_keepalive_time=600\n\n# 3. 永久生效\necho \"net.core.somaxconn = 65535\" >> /etc/sysctl.conf\nsysctl -p\n```"
+  },
+  {
+    "id": 39,
     "cat": "tool",
-    "title": "运维人员应该掌握哪些脚本语言？",
-    "core": "必学：Bash + Python\n选学：Go（写 K8s Operator）\n\nBash — 系统管理、cron、一键脚本\nPython — 复杂逻辑、API 调用、数据处理\nGo — 云原生、Operator、高性能工具",
-    "detail": "### 各场景用什么\n\n  **Bash（5 分钟搞定）**\n  日志清理、批量操作、cron 任务\n  cat /var/log/*.log | grep ERROR | wc -l\n\n  **Python（30 分钟搞定）**\n  调用云 API、解析 JSON/YAML、发告警\n  import requests\n  r = requests.get('https://api.example.com/health')\n  if r.status_code != 200: send_alert()\n\n  **Go（几小时到几天）**\n  K8s Operator、高性能 Agent、CLI 工具\n\n### 学习路线\n\n  刚入行 → 把 Bash 练熟\n  3 年经验 → Python 必须会写\n  5 年经验 → Go 加分\n\n### 推荐项目\n\n  用 Python 写一个：\n  - 批量巡检脚本（SSH 连 100 台机器）\n  - 日志分析统计工具\n  - 钉钉/飞书告警机器人\n\n  用 Bash 写一个：\n  - 一键部署脚本\n  - 系统初始化脚本"
+    "title": "编写一个Shell脚本，批量删除Failed状态的Pod",
+    "core": "**答案：**\n#!/bin/bash\nNAMESPACE=${1:-default}\necho \"正在查找 ${NAMESPACE} 命名空间中Failed状态的Pod...\"\nFAILED_PODS=$(kubectl get pods -n ${NAMESPACE} | grep Failed | awk '{print $1}')\nif [ -z \"$FAILED_PODS\" ]; then",
+    "detail": "**答案：**\n```bash\n#!/bin/bash\n\nNAMESPACE=${1:-default}\n\necho \"正在查找 ${NAMESPACE} 命名空间中Failed状态的Pod...\"\n\nFAILED_PODS=$(kubectl get pods -n ${NAMESPACE} | grep Failed | awk '{print $1}')\n\nif [ -z \"$FAILED_PODS\" ]; then\n    echo \"没有找到Failed状态的Pod\"\n    exit 0\nfi\n\nfor POD in $FAILED_PODS; do\n    echo \"删除Pod: ${POD}\"\n    kubectl delete pod ${POD} -n ${NAMESPACE}\ndone\n\necho \"清理完成\"\n```"
+  },
+  {
+    "id": 40,
+    "cat": "tool",
+    "title": "用Python编写一个监控Pod状态并发送告警的脚本",
+    "core": "**答案：**\n#!/usr/bin/env python3\nimport subprocess\nimport json\nimport smtplib\nfrom email.mime.text import MIMEText",
+    "detail": "**答案：**\n```python\n#!/usr/bin/env python3\nimport subprocess\nimport json\nimport smtplib\nfrom email.mime.text import MIMEText\n\ndef get_failed_pods(namespace=\"default\"):\n    \"\"\"获取Failed状态的Pod\"\"\"\n    cmd = f\"kubectl get pods -n {namespace} -o json\"\n    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)\n    \n    if result.returncode != 0:\n        print(f\"执行命令失败: {result.stderr}\")\n        return []\n    \n    pods_data = json.loads(result.stdout)\n    failed_pods = []\n    \n    for item in pods_data['items']:\n        phase = item['status'].get('phase', '')\n        if phase == 'Failed':\n            pod_info = {\n                'name': item['metadata']['name'],\n                'namespace': namespace,\n                'reason': item['status'].get('conditions', [{}])[0].get('reason', 'Unknown')\n            }\n            failed_pods.append(pod_info)\n    \n    return failed_pods\n\ndef send_alert(failed_pods):\n    \"\"\"发送告警邮件\"\"\"\n    if not failed_pods:\n        return\n    \n    subject = f\"[告警] 发现{len(failed_pods)}个Failed状态的Pod\"\n    body = \"以下Pod处于Failed状态:\\n\\n\"\n    \n    for pod in failed_pods:\n        body += f\"Pod名称: {pod['name']}\\n\"\n        body += f\"命名空间: {pod['namespace']}\\n\"\n        body += f\"失败原因: {pod['reason']}\\n\\n\"\n    \n    msg = MIMEText(body)\n    msg['Subject'] = subject\n    msg['From'] = 'monitor@example.com'\n    msg['To'] = 'admin@example.com'\n    \n    try:\n        server = smtplib.SMTP('smtp.example.com', 587)\n        server.starttls()\n        server.login('user', 'password')\n        server.send_message(msg)\n        server.quit()\n        print(\"告警邮件发送成功\")\n    except Exception as e:\n        print(f\"发送邮件失败: {e}\")\n\nif __name__ == \"__main__\":\n    failed_pods = get_failed_pods()\n    if failed_pods:\n        send_alert(failed_pods)\n        print(f\"发现{len(failed_pods)}个异常Pod，已发送告警\")\n    else:\n        print(\"所有Pod状态正常\")\n```"
+  },
+  {
+    "id": 41,
+    "cat": "ops",
+    "title": "描述一次你处理的复杂K8s故障案例",
+    "core": "**答案要点：**\n- **问题现象**: 清晰描述故障表现\n- **排查过程**: 展示系统性排查思路\n- **根本原因**: 准确定位问题根源\n- **解决方案**: 具体的修复步骤\n- **预防措施**: 如何避免类似问题再次发生",
+    "detail": "**答案要点：**\n- **问题现象**: 清晰描述故障表现\n- **排查过程**: 展示系统性排查思路\n- **根本原因**: 准确定位问题根源\n- **解决方案**: 具体的修复步骤\n- **预防措施**: 如何避免类似问题再次发生\n\n**示例回答：**\n> 某次生产环境出现大量Pod Evicted，排查发现是节点磁盘压力导致。通过分析kubelet日志发现/var/lib/kubelet目录占用过大，进一步定位到容器日志未做轮转。解决方案是配置logrotate定期清理日志，并设置emptyDir的sizeLimit。后续建立了节点磁盘监控告警，阈值设为80%。"
+  },
+  {
+    "id": 42,
+    "cat": "ops",
+    "title": "如何设计一个高可用的K8s集群？",
+    "core": "**答案要点：**\n- **Master节点**: 至少3个etcd节点，多API Server实例\n- **Worker节点**: 跨可用区部署，反亲和性规则\n- **负载均衡**: 外部LB + Keepalived实现高可用\n- **存储**: 使用分布式存储如Ceph\n- **备份**: 定期备份etcd数据",
+    "detail": "**答案要点：**\n- **Master节点**: 至少3个etcd节点，多API Server实例\n- **Worker节点**: 跨可用区部署，反亲和性规则\n- **负载均衡**: 外部LB + Keepalived实现高可用\n- **存储**: 使用分布式存储如Ceph\n- **备份**: 定期备份etcd数据\n- **监控**: 完善的监控告警体系"
+  },
+  {
+    "id": 43,
+    "cat": "ops",
+    "title": "在客户现场进行平台交付时，你会注意哪些关键点？",
+    "core": "**答案要点：**\n- **前期准备**: 了解客户业务需求和技术栈\n- **环境检查**: 验证基础设施满足要求\n- **文档齐全**: 部署文档、操作手册、应急预案\n- **培训到位**: 对客户团队进行充分培训\n- **验收标准**: 明确验收指标和测试用例",
+    "detail": "**答案要点：**\n\n- **前期准备**: 了解客户业务需求和技术栈\n- **环境检查**: 验证基础设施满足要求\n- **文档齐全**: 部署文档、操作手册、应急预案\n- **培训到位**: 对客户团队进行充分培训\n- **验收标准**: 明确验收指标和测试用例\n- **知识转移**: 确保客户能独立运维\n- **风险评估**: 识别潜在风险并制定应对方案\n\n---"
+  },
+  {
+    "id": 44,
+    "cat": "tool",
+    "title": "Java应用在K8s中运行时，如何优化JVM参数？",
+    "core": "**答案：**\nenv:\n- name: JAVA_OPTS\nvalue: >-\n-XX:+UseContainerSupport\n-XX:MaxRAMPercentage=75.0",
+    "detail": "**答案：**\n```yaml\nenv:\n- name: JAVA_OPTS\n  value: >-\n    -XX:+UseContainerSupport\n    -XX:MaxRAMPercentage=75.0\n    -XX:InitialRAMPercentage=50.0\n    -XX:+UseG1GC\n    -XX:MaxGCPauseMillis=200\n    -XX:+HeapDumpOnOutOfMemoryError\n    -XX:HeapDumpPath=/tmp/heapdump.hprof\n```\n\n关键点：\n- 启用`UseContainerSupport`让JVM感知容器限制\n- 使用`MaxRAMPercentage`而非固定堆大小\n- 选择合适的GC算法（G1GC适合大堆）\n- 配置OOM时自动生成堆转储文件"
+  },
+  {
+    "id": 45,
+    "cat": "tool",
+    "title": "如何诊断Java应用的内存泄漏问题？",
+    "core": "**答案：**\n# 1. 监控内存趋势\nkubectl top pod <pod-name>\n# 2. 生成堆转储\njmap -dump:format=b,file=heap.hprof <pid>\n# 3. 分析堆转储",
+    "detail": "**答案：**\n\n```bash\n# 1. 监控内存趋势\nkubectl top pod <pod-name>\n\n# 2. 生成堆转储\njmap -dump:format=b,file=heap.hprof <pid>\n\n# 3. 分析堆转储\n# 使用MAT(Memory Analyzer Tool)或JProfiler分析\n\n# 4. 实时监控\njstat -gcutil <pid> 1000\n\n# 5. 线程分析\njstack <pid> > thread.dump\n```\n\n常见内存泄漏原因：\n- 静态集合类持续增长\n- 未关闭的资源（连接、流）\n- 监听器未注销\n- ThreadLocal使用不当"
+  },
+  {
+    "id": 46,
+    "cat": "ops",
+    "title": "开发转运维 优势",
+    "core": "具备 Java 开发基础，可深度理解业务代码逻辑，故障排查更高效；\n熟悉研发流程，跨部门协作、需求对接更顺畅；\n快速掌握云原生技术栈，适配私有化驻场交付场景。",
+    "detail": "```\n具备 Java 开发基础，可深度理解业务代码逻辑，故障排查更高效；\n熟悉研发流程，跨部门协作、需求对接更顺畅；\n快速掌握云原生技术栈，适配私有化驻场交付场景。\n```"
+  },
+  {
+    "id": 47,
+    "cat": "ops",
+    "title": "突发故障处理流程",
+    "core": "第一时间响应，优先隔离故障、恢复核心业务；\n快速收集日志、操作记录、报错信息，定位根因；\n故障解决后输出复盘报告，优化应急预案。",
+    "detail": "```\n第一时间响应，优先隔离故障、恢复核心业务；\n快速收集日志、操作记录、报错信息，定位根因；\n故障解决后输出复盘报告，优化应急预案。\n```"
+  },
+  {
+    "id": 48,
+    "cat": "ops",
+    "title": "自我介绍",
+    "core": "各位面试官好，我叫刘星，拥有 8 年工作经验，早期从事 Java 开发，后续转型运维工程师，开发 + 运维的复合背景，让我更擅长以工程化思维开展云平台实施交付工作，注重自动化落地、流程规范与业务高可用保障。\n目前我在中电鸿信，负责重庆基层智治平台与驾驶舱项目的整体运维及云平台落地工作。项目采用混合云架构，分为政务网与互联网双区域，项目整体规模涵盖 90 余台 ECS、12 套数据库实例、6 套 Redis 集群，3套对象存储，支撑高并发政务业务访问。\n日常工作中，我负责云环境与容器集群运维、线上故障应急处置、应用发布管理、数据库变更管理、性能优化、网络策略申请、安全合规检查及自动化脚本开发与优化、与第三方对接数据同步，同时承担技术文档编写、问题跟进与跨团队协同工作。技术上我熟练掌握 Linu...",
+    "detail": "```sh\n各位面试官好，我叫刘星，拥有 8 年工作经验，早期从事 Java 开发，后续转型运维工程师，开发 + 运维的复合背景，让我更擅长以工程化思维开展云平台实施交付工作，注重自动化落地、流程规范与业务高可用保障。\n目前我在中电鸿信，负责重庆基层智治平台与驾驶舱项目的整体运维及云平台落地工作。项目采用混合云架构，分为政务网与互联网双区域，项目整体规模涵盖 90 余台 ECS、12 套数据库实例、6 套 Redis 集群，3套对象存储，支撑高并发政务业务访问。\n日常工作中，我负责云环境与容器集群运维、线上故障应急处置、应用发布管理、数据库变更管理、性能优化、网络策略申请、安全合规检查及自动化脚本开发与优化、与第三方对接数据同步，同时承担技术文档编写、问题跟进与跨团队协同工作。技术上我熟练掌握 Linux、mysql、Docker、K8s核心知识点，对主流监控体系prometheus、granfana、alertmanager 、elk 、skywalking 也能熟练使用，能够独立完成故障分析与处理。\n刚接手项目时，运维体系不完善，存在手工发版低效、核心组件单点、变更不规范、权限管控松散、监控缺失等问题。我主导完成多项标准化与自动化改造：基于 Jenkins+Ansible 搭建自动化发布体系，发版时长由小时级降至10分钟内；对核心 Nginx、mycat 集群化改造，消除单点隐患；制定数据库变更规范，实现操作可追溯、可回滚；按最小权限原则优化账号管控，通过堡垒机审计操作；完善 JVM 与业务监控，线上宕机问题下降 80% 以上。\n工作期间我主导完成多项云原生相关重点工作：基于 Canal+Kafka+ES 构建实时数据同步链路，有效缓解数据库高峰压力；将翼图驾驶舱组件迁移至阿里云 ACK 容器集群，完成容器化部署、功能与性能测试。完成数据库信创改造，将 1.5TB 数据从 MySQL 至 GaussDB 的平滑迁移，系统整体响应时间缩短 25%。\n我持有 PMP 与软件设计师证书，具备一定的项目管理能力、问题闭环能力。我希望未来能继续深耕运维领域，通过自动化与可观测性建设持续提升系统稳定性。\n最后，我想说一下现在AI大模型时代的来临，一些基础且重复性的工作已被AI替代，但我们更重要的是处理问题的逻辑思维能力，全局把控能力。 \n以上是我的介绍，谢谢各位面试官！\n```"
   }
 ]
