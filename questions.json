@@ -10,8 +10,113 @@
     "id": 2,
     "cat": "docker",
     "title": "请你简单说说 Docker 的核心原理",
-    "core": "Docker 的核心原理可以概括为三个底层技术：\n\n1. Namespace：负责资源隔离，让容器看不见别人。\n2. Cgroups：负责资源限制，防止容器多吃多占。\n3. UnionFS / OverlayFS：负责分层存储，基础镜像层共享，容器只写自己的可写层。\n\n一句话：Namespace 负责隔离，Cgroups 负责限额，UnionFS 负责镜像分层，三者共同实现 Docker 比虚拟机更轻量、启动更快。",
-    "detail": "面试官你好，我觉得 Docker 的核心原理可以概括为三个底层技术：Namespace、Cgroups、UnionFS。\n\n#### 1. Namespace：实现资源隔离\n\nDocker 为每个容器创建独立的命名空间，包括：\n\n+ PID：进程命名空间\n+ NET：网络命名空间\n+ MNT：挂载点命名空间\n+ UTS：主机名命名空间\n+ USER：用户命名空间\n\n这样容器内的进程只能看到自己的资源，让每个容器看起来像一台独立机器，互不干扰。\n\n#### 2. Cgroups：实现资源限制\n\nDocker 通过 Cgroups 限制容器可以使用的宿主机资源，例如：\n\n+ CPU\n+ 内存\n+ 磁盘 IO\n+ 进程数量\n\n它可以防止单个容器把整台物理机资源耗尽，保障宿主机和其他容器的稳定性。\n\n#### 3. UnionFS：实现分层存储\n\nDocker 使用 UnionFS，生产中常见的是 OverlayFS，把多个只读镜像层和一个容器可写层联合挂载。\n\n基础镜像层只读并且可以共享，容器运行时产生的修改写入自己的可写层。\n\n比如同一台机器上启动 100 个 Nginx 容器，底层 Nginx 镜像只需要存一份，每个容器只保存自己的增量修改，所以更省空间、启动也更快。\n\n总结一句话：\n\nNamespace 负责看不见别人，Cgroups 负责别多吃多占，UnionFS 负责一份底片洗一百张照片。三者共同实现了 Docker 一次构建、到处运行，比传统虚拟机更轻量、启动更快。"
+    "core": "Docker 的核心原理可以概括为四个底层技术：\n\n1. Namespace：负责资源隔离，让容器看不见别人。\n2. Cgroups：负责资源限制，防止容器多吃多占。\n3. UnionFS / OverlayFS：负责分层存储，基础镜像层共享，容器只写自己的可写层。\n4. Chroot / rootfs：提供容器自己的文件系统视图。\n\n一句话：Namespace 负责隔离，Cgroups 负责限额，OverlayFS 负责镜像分层，rootfs 提供运行环境。",
+    "detail": "面试官你好，我觉得 Docker 的核心原理可以概括为四个底层技术：Namespace、Cgroups、UnionFS / OverlayFS、rootfs / chroot。\n\n#### 1. Namespace：实现资源隔离\n\nDocker 为每个容器创建独立的命名空间，包括：\n\n+ PID：进程命名空间\n+ NET：网络命名空间\n+ MNT：挂载点命名空间\n+ UTS：主机名命名空间\n+ IPC：进程间通信命名空间\n+ USER：用户命名空间\n\n这样容器内的进程只能看到自己的资源，让每个容器看起来像一台独立机器，互不干扰。\n\n#### 2. Cgroups：实现资源限制\n\nDocker 通过 Cgroups 限制容器可以使用的宿主机资源，例如 CPU、内存、磁盘 IO、进程数量等。\n\n它可以防止单个容器把整台物理机资源耗尽，保障宿主机和其他容器的稳定性。\n\n#### 3. UnionFS / OverlayFS：实现分层存储\n\nDocker 使用联合文件系统，生产中常见的是 OverlayFS，把多个只读镜像层和一个容器可写层联合挂载。\n\n基础镜像层只读并且可以共享，容器运行时产生的修改写入自己的可写层。\n\n比如同一台机器上启动 100 个 Nginx 容器，底层 Nginx 镜像只需要存一份，每个容器只保存自己的增量修改，所以更省空间、启动也更快。\n\n#### 4. rootfs / chroot：提供容器文件系统视图\n\n容器不是完整虚拟机，它共享宿主机内核，但通过 rootfs 提供一套独立的用户态文件系统。chroot 可以改变进程看到的根目录，让进程只能访问指定目录下的内容。\n\n总结一句话：\n\nNamespace 负责看不见别人，Cgroups 负责别多吃多占，OverlayFS 负责一份底片洗一百张照片，rootfs 提供容器自己的运行环境。三者共同实现 Docker 一次构建、到处运行，比传统虚拟机更轻量、启动更快。"
+  },
+  {
+    "id": 3,
+    "cat": "docker",
+    "title": "你在工作中使用过 Docker 吗？常用命令有哪些？",
+    "core": "使用过。Docker 常用命令可以按镜像管理、容器管理、排障查看三类回答。\n\n1. 镜像管理：docker pull、push、images、tag、save、load、rmi、inspect。\n2. 容器管理：docker run、ps、exec、logs、stop、start、restart、rm。\n3. 排障查看：docker inspect、stats、top、events。\n\n面试时不要只背命令，最好说明命令使用场景。",
+    "detail": "使用过。日常工作里 Docker 常用命令我一般按场景来记：镜像管理、容器管理、排障查看。\n\n#### 1. Docker 镜像管理\n\n```sh\n# 拉取镜像\ndocker pull nginx:1.25\n\n# 推送镜像到仓库\ndocker push harbor.liux.com/liux/nginx:v1\n\n# 查看本地镜像\ndocker images\ndocker image ls\n\n# 给镜像重新打标签\ndocker tag nginx:latest harbor.liux.com/liux/nginx:v1\n\n# 保存镜像为 tar 包\ndocker save -o nginx.tar nginx:latest\n\n# 从 tar 包加载镜像\ndocker load -i nginx.tar\n\n# 删除镜像，注意是 rmi，不是 rm\ndocker rmi nginx:latest\n\n# 查看镜像详细信息\ndocker inspect nginx:latest\n```\n\n#### 2. Docker 容器管理\n\n```sh\n# 查看正在运行的容器\ndocker ps\n\n# 查看所有容器\ndocker ps -a\n\n# 查看最近一个启动的容器\ndocker ps -l\n\n# 只列出运行中容器 ID\ndocker ps -q\n\n# 显示容器大小，多一个 SIZE 字段\ndocker ps -s\n\n# 创建并启动容器\ndocker run -d --name nginx -p 80:80 nginx:latest\n\n# 进入容器执行命令\ndocker exec -it nginx sh\n\n# 查看日志\ndocker logs -f --tail=100 nginx\n\n# 停止、启动、重启、删除容器\ndocker stop nginx\ndocker start nginx\ndocker restart nginx\ndocker rm nginx\n```\n\n#### 3. 排障和资源查看\n\n```sh\n# 查看容器详细信息，包括 IP、挂载、网络、启动参数\ndocker inspect nginx\n\n# 查看容器资源占用\ndocker stats\n\n# 查看容器内进程\ndocker top nginx\n\n# 查看 Docker 事件\ndocker events\n```\n\n面试时可以总结一句：我工作中常用 Docker 做镜像拉取、镜像打包、容器启动、日志查看、进入容器排障和资源监控。"
+  },
+  {
+    "id": 4,
+    "cat": "docker",
+    "title": "你在工作中使用过 Dockerfile 吗？常用指令有哪些？",
+    "core": "使用过。Dockerfile 是用配置文件自动构建镜像的方式。\n\n常用指令：FROM 指定基础镜像；RUN 构建阶段执行命令；COPY / ADD 拷贝文件；ENV / ARG 定义变量；CMD / ENTRYPOINT 定义启动命令；EXPOSE 声明端口；USER 指定运行用户；WORKDIR 指定工作目录；VOLUME 声明数据卷。\n\n构建命令：docker build -t 镜像名:标签 .，构建后再 docker push 推送到仓库。",
+    "detail": "使用过。Dockerfile 本质上就是通过一组声明式指令自动构建镜像，避免手工进入容器修改后再 commit。\n\n#### 1. 常用 Dockerfile 指令\n\n```dockerfile\n# 指定基础镜像\nFROM nginx:1.25-alpine\n\n# 构建阶段执行命令，通常用于安装软件、创建目录、修改配置\nRUN apk add --no-cache curl\n\n# 拷贝宿主机文件到镜像中，不会自动解压 tar 包\nCOPY nginx.conf /etc/nginx/nginx.conf\n\n# ADD 也能拷贝文件，额外支持自动解压本地 tar 包、支持 URL，但生产中更推荐优先用 COPY\nADD app.tar.gz /opt/app/\n\n# 运行时环境变量，容器启动后仍然存在\nENV APP_ENV=prod\n\n# 构建阶段变量，只在 docker build 阶段生效\nARG VERSION=1.0\n\n# 给镜像打元数据标签\nLABEL maintainer=\"liux\"\n\n# 容器启动时默认命令，可以被 docker run 后面的 command 覆盖\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n\n# 容器入口命令，不容易被覆盖；如果同时有 CMD，CMD 会作为 ENTRYPOINT 参数\nENTRYPOINT [\"/docker-entrypoint.sh\"]\n\n# 声明容器服务端口，只是元数据说明，不等于自动映射端口\nEXPOSE 80\n\n# 指定运行用户，不指定默认 root\nUSER nginx\n\n# 指定工作目录，不存在会自动创建\nWORKDIR /opt/app\n\n# 声明数据卷，通常用于持久化目录\nVOLUME [\"/data\"]\n```\n\n#### 2. CMD 和 ENTRYPOINT 的区别\n\n+ CMD：容器默认启动命令，docker run 后面指定命令时会覆盖 CMD。\n+ ENTRYPOINT：容器入口命令，docker run 后面指定的 command 通常会作为参数传给 ENTRYPOINT。\n+ 两者结合时，ENTRYPOINT 定义主程序，CMD 定义默认参数。\n\n#### 3. 构建和推送镜像\n\n```sh\n# 在当前目录读取 Dockerfile 构建镜像\ndocker build -t harbor.liux.com/liux/nginx:v1 .\n\n# 指定 Dockerfile 路径构建\ndocker build -f ./Dockerfile -t nginx:v1 .\n\n# 私有仓库需要先登录\ndocker login harbor.liux.com\n\n# 推送镜像\ndocker push harbor.liux.com/liux/nginx:v1\n```\n\n#### 4. 几种镜像制作方式\n\n```sh\n# 方式一：基于运行中容器 commit，不推荐作为长期生产方式，适合临时留存现场\ndocker commit -a 'liux' -m 'fix bug' <container_id> liux-games:v0.2\n\n# 方式二：容器文件系统导出导入，会丢失镜像历史、环境变量等元数据\ndocker export -o nginx.tar.gz <container_id>\ndocker import nginx.tar.gz nginx:1.20.1\n\n# 方式三：镜像 save/load，适合离线环境迁移镜像，保留镜像层和元数据\ndocker save -o alpine-latest.tar.gz alpine:latest\ndocker load -i alpine-latest.tar.gz\n```\n\n生产中我更推荐 Dockerfile + CI/CD 自动构建，既可追溯，也方便版本管理。"
+  },
+  {
+    "id": 5,
+    "cat": "docker",
+    "title": "请简述一下 Dockerfile 的优化思路",
+    "core": "Dockerfile 优化核心原则是：镜像尽可能小，构建尽可能快，层数和缓存利用尽可能合理。\n\n常见做法：选择小基础镜像；使用 .dockerignore；把变动少的步骤放前面充分利用缓存；合并 RUN 并清理缓存；多阶段构建；固定版本号；减少无用软件包；尽量非 root 运行。",
+    "detail": "Dockerfile 优化我一般从构建速度、镜像体积、安全性和可维护性四个角度回答。\n\n#### 1. 提高构建速度\n\n+ 充分利用 Docker layer cache，把变化少的步骤放在前面，变化频繁的业务代码放后面。\n+ 使用国内镜像源或公司内部镜像源，加快依赖下载。\n+ 使用 .dockerignore 忽略无用文件，例如 .git、node_modules、target、日志文件，减少 build context。\n+ 依赖安装和业务代码 COPY 分开写，避免业务代码变化导致依赖层重新构建。\n\n#### 2. 减小镜像体积\n\n+ 选择更小的基础镜像，例如 alpine、slim、distroless。\n+ 合并 RUN 指令，并在同一层里清理缓存。\n+ 删除无用的软件包、临时文件、编译产物。\n+ 使用多阶段构建，只把最终运行需要的二进制、jar 包或静态文件复制到运行阶段镜像。\n\n#### 3. 提升安全性\n\n+ 不在镜像里写死密码、token、私钥。\n+ 尽量不用 latest 标签，固定基础镜像版本。\n+ 尽量使用非 root 用户运行容器。\n+ 定期扫描镜像漏洞，及时升级基础镜像。\n\n#### 4. 示例\n\n```dockerfile\nFROM maven:3.9-eclipse-temurin-17 AS build\nWORKDIR /src\nCOPY pom.xml .\nRUN mvn -B dependency:go-offline\nCOPY . .\nRUN mvn -B package -DskipTests\n\nFROM eclipse-temurin:17-jre-alpine\nWORKDIR /app\nCOPY --from=build /src/target/app.jar /app/app.jar\nUSER 10001\nENTRYPOINT [\"java\", \"-jar\", \"/app/app.jar\"]\n```\n\n一句话总结：优化 Dockerfile 就是用缓存提速，用小镜像和多阶段构建瘦身，用非 root 和固定版本提升安全性。"
+  },
+  {
+    "id": 6,
+    "cat": "docker",
+    "title": "一个 Dockerfile 中可以写几个 FROM 指令？",
+    "core": "可以写多个 FROM，这叫多阶段构建。\n\n每个 FROM 开启一个新的构建阶段，前面阶段可以负责编译、打包，最后阶段只保留运行时需要的文件。这样可以减小最终镜像体积，也让构建过程更清晰。",
+    "detail": "一个 Dockerfile 中可以写多个 FROM，这就是多阶段构建。\n\n#### 1. 为什么能写多个 FROM\n\n每个 FROM 都会开启一个新的构建阶段，可以用 AS 给阶段命名。\n\n前面的阶段通常负责：\n\n+ 下载依赖\n+ 编译代码\n+ 打包二进制或 jar 包\n+ 构建前端静态文件\n\n最后一个阶段通常只保留运行时必需文件。\n\n#### 2. 示例\n\n```dockerfile\nFROM golang:1.22 AS build\nWORKDIR /src\nCOPY . .\nRUN go build -o app main.go\n\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=build /src/app /app/app\nENTRYPOINT [\"/app/app\"]\n```\n\n#### 3. 好处\n\n+ 减小镜像大小，编译工具链不会进入最终镜像。\n+ 提高安全性，最终镜像攻击面更小。\n+ 构建逻辑更清晰，编译阶段和运行阶段分离。\n\n所以面试可以直接说：Dockerfile 可以写多个 FROM，多阶段构建是生产环境非常常见的镜像优化手段。"
+  },
+  {
+    "id": 7,
+    "cat": "docker",
+    "title": "Docker 单机的网络类型有哪些？",
+    "core": "Docker 单机常见网络类型有五种：none、host、bridge、container、自定义网络。\n\nnone：只有 loopback，不能上外网；host：共享宿主机网络，性能好但端口易冲突；bridge：默认桥接 NAT 网络；container：和指定容器共享网络命名空间；custom network：自定义网络，容器名可互相解析，生产更常用。",
+    "detail": "Docker 单机常见网络类型主要有五种：none、host、bridge、container、自定义网络。\n\n#### 1. none\n\n容器只有本地回环网卡 lo，没有其他网卡，基本不能访问外部网络。\n\n适合对网络隔离要求很高，或者只做本地计算任务的容器。\n\n```sh\ndocker run --network none busybox ip addr\n```\n\n#### 2. host\n\n容器直接使用宿主机网络命名空间，没有独立 IP。\n\n优点是网络性能好，少一层 NAT；缺点是端口可能冲突，隔离性差。\n\n```sh\ndocker run --network host nginx\n```\n\n#### 3. bridge\n\n默认网络模式。Docker 会创建 docker0 网桥，容器通过 veth pair 接入网桥，再通过 NAT 访问外部网络。\n\n特点是隔离性较好，但有 NAT 转发开销。\n\n```sh\ndocker run --network bridge nginx\n```\n\n#### 4. container\n\n新容器和指定容器共享同一个网络命名空间，也就是共享 IP、端口、网卡。\n\n常见于 sidecar 场景。\n\n```sh\ndocker run --network container:<container_id> busybox\n```\n\n#### 5. custom network\n\n用户自定义网络，常用 bridge driver。相比默认 bridge，自定义网络支持容器名 DNS 解析，更适合 docker-compose 或多容器联调。\n\n```sh\ndocker network create app-net\ndocker run -d --name web --network app-net nginx\n```\n\n一句话：默认 bridge 用得最多，host 追求性能但隔离性差，自定义网络更适合生产或 compose 场景。"
+  },
+  {
+    "id": 8,
+    "cat": "docker",
+    "title": "Docker 底层是如何实现的？用到了哪些 Linux 内核特性？",
+    "core": "Docker 底层主要用到四类 Linux 技术：chroot / rootfs、Namespace、Cgroups、OverlayFS。\n\nchroot/rootfs 提供容器自己的文件系统视图；Namespace 实现进程、网络、挂载、用户等资源隔离；Cgroups 限制 CPU、内存、IO 等资源；OverlayFS 实现镜像分层和联合挂载。",
+    "detail": "Docker 并不是传统虚拟机，它共享宿主机内核，底层主要依赖 Linux 的 chroot / rootfs、Namespace、Cgroups、OverlayFS 等能力。\n\n#### 1. chroot / rootfs\n\nchroot 可以改变进程看到的根目录，使程序不能访问该目录之外的文件。\n\nDocker 容器会有自己的 rootfs，也就是容器运行所需要的一套用户态文件系统，例如 /bin、/lib、/etc 等。\n\n#### 2. Namespace\n\nNamespace 是 Linux 提供的资源隔离机制，让容器中的进程运行在独立命名空间中，只能访问当前命名空间里的资源。\n\n常见 Namespace：\n\n+ PID：隔离进程 ID\n+ NET：隔离网络设备、IP、端口、路由表\n+ MNT：隔离挂载点\n+ UTS：隔离主机名\n+ IPC：隔离进程间通信\n+ USER：隔离用户和用户组\n\n#### 3. Cgroups\n\nCgroups 用来限制和统计进程资源使用情况，例如：\n\n+ CPU 使用比例\n+ 内存上限\n+ 磁盘 IO\n+ Pids 数量\n\n这样可以防止一个容器耗尽宿主机资源。\n\n#### 4. OverlayFS\n\nOverlayFS 是一种联合文件系统，依赖宿主机底层文件系统，比如 ext4、xfs。\n\n它把多个只读镜像层和一个容器可写层合并展示给用户。用户看到的是一个完整目录，但底层其实是多层叠加。\n\n一句话总结：Docker 用 Namespace 做隔离，用 Cgroups 做限额，用 OverlayFS 做镜像分层，用 rootfs 提供文件系统，因此比虚拟机轻量很多。"
+  },
+  {
+    "id": 9,
+    "cat": "docker",
+    "title": "Docker Swarm 有了解过吗？",
+    "core": "了解过。Docker Swarm 是 Docker 官方的轻量级容器集群编排工具，可以做服务编排、滚动更新、服务发现、负载均衡和副本管理。\n\n不过现在生产主流已经转向 Kubernetes，Swarm 更适合中小规模、简单场景或历史项目维护。",
+    "detail": "了解过。Docker Swarm 是 Docker 官方提供的轻量级容器集群编排工具。\n\n#### 1. Swarm 能做什么\n\n+ 多节点容器编排\n+ 服务副本管理\n+ 服务发现\n+ 内置负载均衡\n+ 滚动更新和回滚\n+ Secret / Config 管理\n\n#### 2. 基本概念\n\n+ Manager：管理节点，负责调度和集群状态维护。\n+ Worker：工作节点，负责真正运行容器任务。\n+ Service：服务定义，类似一组副本。\n+ Task：具体运行在节点上的容器任务。\n\n#### 3. 常见命令\n\n```sh\n# 初始化 Swarm 集群\ndocker swarm init\n\n# 创建服务\ndocker service create --name nginx --replicas 3 -p 80:80 nginx\n\n# 查看服务\ndocker service ls\ndocker service ps nginx\n\n# 扩缩容\ndocker service scale nginx=5\n\n# 滚动更新\ndocker service update --image nginx:1.25 nginx\n```\n\n#### 4. 和 Kubernetes 的关系\n\nSwarm 上手简单，和 Docker CLI 集成度高，但生态、扩展能力、社区活跃度都不如 Kubernetes。\n\n所以现在生产环境更多选择 Kubernetes，Swarm 多见于历史项目、小规模集群或简单编排场景。"
+  },
+  {
+    "id": 10,
+    "cat": "docker",
+    "title": "Docker 监控如何做？",
+    "core": "Docker 监控常见方案是 cAdvisor + Prometheus + Grafana。\n\ncAdvisor 负责采集容器 CPU、内存、网络、文件系统等指标；Prometheus 负责拉取和存储指标；Grafana 负责展示看板；告警可以接 Alertmanager。",
+    "detail": "Docker 容器监控我一般用 cAdvisor + Prometheus + Grafana 这一套。\n\n#### 1. cAdvisor 的作用\n\ncAdvisor 是 Google 开源的容器监控组件，可以自动发现宿主机上的容器，并采集容器资源使用情况。\n\n常见指标包括：\n\n+ CPU 使用率\n+ 内存使用量\n+ 网络收发流量\n+ 文件系统读写\n+ 容器运行状态\n\n它会为每个容器保存资源隔离参数、历史资源使用情况和网络统计信息。\n\n#### 2. Prometheus 的作用\n\nPrometheus 定期从 cAdvisor 暴露的 metrics 接口拉取指标，并负责存储和查询。\n\n#### 3. Grafana 的作用\n\nGrafana 对 Prometheus 数据源做可视化展示，例如容器 CPU Top、内存 Top、网络流量、磁盘 IO 等看板。\n\n#### 4. 告警\n\n如果需要告警，可以加 Alertmanager，例如：\n\n+ 容器 CPU 长时间超过 80%\n+ 内存使用接近 limit\n+ 容器频繁重启\n+ 宿主机磁盘空间不足\n\n一句话：cAdvisor 采集容器指标，Prometheus 存储和查询，Grafana 展示，Alertmanager 告警。"
+  },
+  {
+    "id": 11,
+    "cat": "docker",
+    "title": "Harbor 仓库如何搭建高可用？",
+    "core": "Harbor 高可用常见有两种思路：共享存储 + 多实例，或者多 Harbor 实例之间做镜像复制。\n\n生产中还要考虑数据库、Redis、对象存储、入口负载均衡和备份恢复。简单场景可以 Keepalived + NFS；更推荐把镜像层放对象存储，前面用 SLB/Nginx，数据库和 Redis 做高可用。",
+    "detail": "Harbor 高可用我会按组件拆开说：入口、Harbor 应用、存储、数据库、Redis、备份。\n\n#### 1. 简单方案：共享存储 + Keepalived\n\n多个 Harbor 节点共享同一套存储，比如 NFS，前面用 Keepalived 做 VIP 高可用。\n\n优点是部署简单；缺点是 NFS 本身会成为性能瓶颈和单点，需要额外备份和高可用。\n\n#### 2. 推荐方案：多实例 + 外部高可用组件\n\n生产更推荐：\n\n+ 前端入口：SLB / Nginx / Keepalived\n+ Harbor 多实例：无状态组件横向扩展\n+ 镜像存储：对象存储，比如 S3、MinIO、Ceph、OSS\n+ 数据库：外部高可用 PostgreSQL\n+ Redis：外部高可用 Redis\n+ JobService：按官方建议控制副本和任务调度\n\n#### 3. 镜像复制方案\n\nHarbor 自带复制规则，可以在多个 Harbor 实例之间同步镜像。\n\n适合异地容灾、跨机房同步、从旧仓库迁移到新仓库。\n\n#### 4. 备份重点\n\n+ Harbor 配置文件\n+ PostgreSQL 数据\n+ Redis 数据或可重建状态\n+ 镜像存储后端\n+ 证书和密钥\n\n一句话：小规模可以 Keepalived + 共享存储；生产更推荐外部数据库、外部 Redis、对象存储、多 Harbor 实例和统一入口负载均衡。"
+  },
+  {
+    "id": 12,
+    "cat": "docker",
+    "title": "Docker Registry 迁移到 Harbor 如何做？",
+    "core": "Docker Registry 迁移到 Harbor 常见两种方式：Harbor 页面配置复制规则，或者写脚本批量拉取、打标签、推送。\n\n脚本迁移流程：从旧 registry 拉取镜像 → 按 Harbor 项目路径重新 tag → 登录 Harbor → push 到 Harbor。注意 Harbor 镜像名需要包含项目名，例如 harbor.liux.com/library/nginx:1.25。",
+    "detail": "Docker Registry 迁移到 Harbor 我一般会提供两种方案：页面复制规则和脚本批量迁移。\n\n#### 1. 方案一：Harbor 复制规则\n\n如果源仓库和目标仓库网络互通，可以在 Harbor 页面配置 Registry Endpoint 和 Replication Rule。\n\n优点：可视化、简单、适合持续同步。\n\n#### 2. 方案二：脚本批量迁移\n\n流程是：\n\n1. 从旧 docker-registry 拉取镜像。\n2. 给镜像重新打 tag。\n3. 登录 Harbor。\n4. 推送到 Harbor。\n5. 校验 Harbor 页面镜像和 tag 是否完整。\n\n示例：\n\n```sh\nOLD_REG=registry.old.com\nNEW_REG=harbor.liux.com\nPROJECT=liux\nIMAGE=nginx\nTAG=1.25\n\ndocker pull ${OLD_REG}/${IMAGE}:${TAG}\ndocker tag ${OLD_REG}/${IMAGE}:${TAG} ${NEW_REG}/${PROJECT}/${IMAGE}:${TAG}\ndocker login ${NEW_REG}\ndocker push ${NEW_REG}/${PROJECT}/${IMAGE}:${TAG}\n```\n\n#### 3. 注意点\n\nHarbor 镜像路径必须带项目名，否则会推送失败或路径不符合预期。\n\n比如旧仓库是：\n\n```text\nregistry.old.com/nginx:1.25\n```\n\n迁移到 Harbor 应该打成：\n\n```text\nharbor.liux.com/liux/nginx:1.25\n```\n\n也就是需要多打一层项目目录。\n\n#### 4. 迁移后校验\n\n+ 校验镜像数量和 tag 数量。\n+ 抽样 pull 测试。\n+ 检查业务部署 YAML 或 compose 文件中的镜像地址是否已替换。\n+ 配置镜像清理策略和权限。"
+  },
+  {
+    "id": 13,
+    "cat": "docker",
+    "title": "Docker 如何控制一组容器的运行？",
+    "core": "Docker 单机控制一组容器通常用 Docker Compose。\n\nCompose 通过 docker-compose.yml 定义多个服务、网络、卷、环境变量和启动依赖。常用命令：docker compose up -d 启动；docker compose down 停止并删除；docker compose logs -f 查看日志；docker compose ps 查看状态。",
+    "detail": "Docker 单机管理一组容器，最常用的是 Docker Compose。\n\n#### 1. Docker Compose 是什么\n\nDocker Compose 通过 docker-compose.yml 文件定义一组容器，包括服务、镜像、端口、环境变量、挂载卷、网络、依赖关系等。\n\n适合单机多容器应用，例如 Nginx + Java + MySQL + Redis。\n\n#### 2. 常用命令\n\n```sh\n# 创建并后台启动容器\ndocker compose up -d\n# 老版本命令是 docker-compose up -d\n\n# 查看容器状态\ndocker compose ps\n\n# 查看日志\ndocker compose logs -f --tail=100\n\n# 停止并删除容器、默认网络\ndocker compose down\n\n# 1 秒后停止容器\ndocker compose down -t 1\n\n# 重新构建并启动\ndocker compose up -d --build\n\n# 只重启某个服务\ndocker compose restart nginx\n```\n\n#### 3. 简单 compose 示例\n\n```yaml\nservices:\n  nginx:\n    image: nginx:1.25\n    ports:\n      - \"80:80\"\n    volumes:\n      - ./nginx.conf:/etc/nginx/nginx.conf\n  redis:\n    image: redis:7\n```\n\n一句话：单机多容器用 Docker Compose；多节点生产编排一般用 Kubernetes。"
+  },
+  {
+    "id": 14,
+    "cat": "docker",
+    "title": "Docker 的存储卷是如何管理的？",
+    "core": "Docker 存储卷通过 docker volume 管理。\n\n常用命令：docker volume ls 查看卷；docker volume create 创建卷；docker volume inspect 查看详情；docker volume rm 删除指定卷；docker volume prune 清理未使用卷。\n\n生产中数据持久化建议用 named volume 或绑定挂载，并做好备份。",
+    "detail": "Docker 容器本身是临时的，容器删除后可写层也会丢失，所以需要通过 volume 或 bind mount 做数据持久化。\n\n#### 1. volume 常用命令\n\n```sh\n# 查看存储卷列表\ndocker volume ls\n\n# 创建存储卷\ndocker volume create liux\n\n# 查看存储卷详细信息\ndocker volume inspect liux\n\n# 删除指定存储卷\ndocker volume rm liux\n\n# 清理未被容器使用的存储卷\ndocker volume prune -f\n\n# 删除所有存储卷，危险操作\ndocker volume rm $(docker volume ls -q)\n```\n\n#### 2. 使用 volume\n\n```sh\ndocker run -d --name mysql   -v mysql-data:/var/lib/mysql   -e MYSQL_ROOT_PASSWORD=123456   mysql:8\n```\n\n#### 3. volume 和 bind mount 区别\n\n+ volume：Docker 管理，默认在 /var/lib/docker/volumes，更适合生产持久化。\n+ bind mount：直接挂载宿主机目录，路径可控，适合开发调试或指定目录挂载。\n\n#### 4. 注意事项\n\n+ 数据库、上传文件、配置文件要明确持久化目录。\n+ 删除容器不等于删除 volume。\n+ prune 会清理未使用卷，生产环境慎用。\n+ 关键数据要做备份。"
+  },
+  {
+    "id": 15,
+    "cat": "docker",
+    "title": "Docker 如何创建自定义网络？",
+    "core": "Docker 自定义网络通过 docker network 管理。\n\n常用命令：docker network ls 查看网络；docker network create 创建网络；docker network inspect 查看详情；docker network connect 把容器加入网络；docker network disconnect 断开网络；docker network rm 删除网络；docker network prune 清理未使用网络。",
+    "detail": "Docker 自定义网络一般用 docker network create 创建，最常见的是自定义 bridge 网络。\n\n#### 1. 常用命令\n\n```sh\n# 查看网络\ndocker network ls\n\n# 创建自定义 bridge 网络\ndocker network create app-net\n\n# 指定网段创建网络\ndocker network create --subnet 172.20.0.0/16 app-net\n\n# 查看网络详情\ndocker network inspect app-net\n\n# 容器启动时加入网络\ndocker run -d --name nginx --network app-net nginx\n\n# 已运行容器连接到网络\ndocker network connect app-net nginx\n\n# 断开容器网络\ndocker network disconnect app-net nginx\n\n# 删除网络\ndocker network rm app-net\n\n# 清理未使用网络\ndocker network prune -f\n```\n\n#### 2. 为什么要用自定义网络\n\n相比默认 bridge，自定义网络有几个好处：\n\n+ 支持容器名 DNS 解析。\n+ 多个应用可以用不同网络隔离。\n+ 可以自定义网段，避免和宿主机或办公网冲突。\n+ 配合 docker compose 更方便。\n\n#### 3. 示例\n\n```sh\ndocker network create app-net\ndocker run -d --name redis --network app-net redis:7\ndocker run -d --name app --network app-net myapp:v1\n```\n\n在 app 容器里可以直接通过 redis:6379 访问 Redis。"
+  },
+  {
+    "id": 16,
+    "cat": "docker",
+    "title": "Docker 容器在宿主机能访问，但 Windows 访问不了，如何排查？",
+    "core": "排查思路：先确认服务是否监听正确地址和端口，再确认端口映射，再查宿主机防火墙、路由转发、iptables/NAT 规则，最后用 tcpdump/Wireshark 抓包确认数据包到哪一层丢了。\n\n重点检查：docker ps 端口映射、ss -tlnp 监听、宿主机防火墙、net.ipv4.ip_forward、Windows 到宿主机网络连通性。",
+    "detail": "如果 Docker 容器在宿主机能正常访问，但 Windows 访问不了，我会按网络链路从内到外排查。\n\n#### 1. 确认容器服务是否正常\n\n```sh\n# 查看容器状态\ndocker ps\n\n# 查看容器日志\ndocker logs --tail=100 <container>\n\n# 进入容器本地访问服务\ndocker exec -it <container> sh\ncurl 127.0.0.1:<port>\n```\n\n注意服务是否只监听了 127.0.0.1。如果只监听容器内部回环地址，外部可能访问不到。\n\n#### 2. 确认端口映射是否正确\n\n```sh\n# 看 PORTS 字段\ndocker ps\n\n# 查看容器详细端口映射\ndocker inspect <container>\n\n# 宿主机本地访问映射端口\ncurl 127.0.0.1:<host_port>\n```\n\n比如应该看到类似：\n\n```text\n0.0.0.0:8080->80/tcp\n```\n\n如果只绑定 127.0.0.1:8080，Windows 访问宿主机 IP 就可能不通。\n\n#### 3. 检查宿主机监听和防火墙\n\n```sh\nss -tlnp | grep 8080\nsystemctl status firewalld\niptables -L -n\niptables -t nat -L -n\n```\n\n如果宿主机防火墙拦截，需要放行端口。\n\n#### 4. 检查路由转发\n\n```sh\nsysctl net.ipv4.ip_forward\n```\n\n正常应为：\n\n```text\nnet.ipv4.ip_forward = 1\n```\n\n如果不是 1，需要开启：\n\n```sh\nsysctl -w net.ipv4.ip_forward=1\n```\n\n#### 5. 检查 Windows 和宿主机连通性\n\n在 Windows 上测试：\n\n```powershell\nping <宿主机IP>\ntest-netconnection <宿主机IP> -port <host_port>\n```\n\n如果 ping 不通，先看网络、防火墙、路由；如果 ping 通但端口不通，再看宿主机防火墙和 Docker NAT。\n\n#### 6. 抓包定位\n\n```sh\ntcpdump -i any port <host_port>\n```\n\nWindows 侧也可以用 Wireshark 看包是否发出。通过抓包判断数据是否到达宿主机、是否转发到 docker0、是否返回。\n\n一句话：先容器内，再宿主机本地，再 Windows 到宿主机，再 iptables/NAT，最后抓包定位丢包点。"
+  },
+  {
+    "id": 17,
+    "cat": "docker",
+    "title": "Docker 容器和虚拟机的区别？",
+    "core": "容器和虚拟机都能隔离应用，但隔离层级不同。\n\n虚拟机通过 Hypervisor 虚拟化完整操作系统，每个 VM 有自己的内核；Docker 容器共享宿主机内核，只隔离进程、网络、文件系统等资源。\n\n所以容器更轻量、启动更快、资源占用更少；虚拟机隔离性更强，适合不同内核或强隔离场景。",
+    "detail": "Docker 容器和虚拟机都能实现应用隔离和环境封装，但两者的隔离层级不同。\n\n#### 1. 虚拟机\n\n虚拟机通过 Hypervisor 虚拟化硬件，在虚拟硬件上运行完整操作系统。\n\n每台虚拟机都有：\n\n+ 独立内核\n+ 完整操作系统\n+ 独立系统服务\n+ 独立磁盘和网络\n\n优点是隔离性强，可以运行不同操作系统；缺点是资源占用大、启动慢、镜像体积大。\n\n#### 2. Docker 容器\n\n容器不是虚拟完整硬件，而是共享宿主机内核，通过 Namespace、Cgroups、OverlayFS 等技术隔离进程和文件系统。\n\n容器只包含应用和依赖库，不需要完整操作系统。\n\n优点是：\n\n+ 启动快，通常秒级甚至毫秒级\n+ 镜像小\n+ 资源占用少\n+ 部署和扩缩容方便\n\n缺点是隔离性弱于虚拟机，并且容器必须和宿主机共享同类内核，比如 Linux 容器依赖 Linux 内核。\n\n#### 3. 总结对比\n\n| 对比项 | Docker 容器 | 虚拟机 |\n|---|---|---|\n| 隔离方式 | 进程级隔离 | 硬件级虚拟化 |\n| 内核 | 共享宿主机内核 | 每台 VM 独立内核 |\n| 启动速度 | 秒级 | 分钟级 |\n| 资源占用 | 少 | 多 |\n| 镜像体积 | 小 | 大 |\n| 隔离性 | 较弱 | 更强 |\n\n一句话：容器更轻量、启动更快，适合微服务和快速交付；虚拟机隔离性更强，适合强隔离和多操作系统场景。"
   },
   {
     "id": 1,
