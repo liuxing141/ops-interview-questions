@@ -1,6 +1,20 @@
 [
   {
     "id": 1,
+    "cat": "docker",
+    "title": "Docker 和 Containerd 的区别",
+    "core": "Docker 和 Containerd 可以从四个维度区分：\n\n1. 定位架构：Docker 是完整容器平台；Containerd 是底层容器运行时。\n2. 底层依赖：Docker 底层依赖 Containerd，Docker 在其上封装镜像构建、网络、日志、exec 等能力。\n3. K8s 适配：K8s 1.24 后更推荐 kubelet 通过 CRI 直连 Containerd，链路更短、资源占用更少。\n4. 操作命令：Docker 常用 docker 命令；Containerd 原生 ctr 偏调试，日常更常用 nerdctl。\n\n一句话：Docker 是完整容器平台，内部依赖 Containerd；Containerd 是轻量运行时，更适合 K8s 生产环境。",
+    "detail": "今天有个粉丝私信我，说面试被问到 Docker 和 Containerd 的区别，当场卡壳。\n这个题真的是面试高频题，今天我从四个维度一次讲清楚，下次再被问到就可以直接背了！\n\nDocker 和 Containerd 我从四个维度区分：定位架构、底层依赖、K8s 适配、客户端命令，最后做总结。\n\n#### 1. 定位架构\n\n+ Docker 是一个全栈的容器化平台，包含客户端 Docker CLI、守护进程 Dockerd、镜像构建、容器网络、存储卷、容器运行时等全套功能。\n+ Containerd 是一个纯粹的底层容器运行时，仅负责容器生命周期管理，例如拉取镜像、创建/启动/停止容器、管理存储和网络命名空间等。它是从 Docker 中拆分出来的核心组件。\n\n#### 2. 底层依赖\n\n+ Docker 底层依托 Containerd 工作，Containerd 是 Docker 的底层引擎。\n+ Docker 在 Containerd 之上封装了额外上层能力，比如镜像构建、容器日志、docker exec、Docker Compose 等高级功能。\n\n#### 3. K8s 适配\n\n+ K8s 对接 Docker：kubelet 调用 dockerd，dockerd 再调用 containerd，containerd 最后调用 runc 来实际运行容器，链路长、损耗高。\n+ K8s 对接 Containerd：kubelet 通过 CRI 直连 containerd，链路短、性能更优、资源占用更少。\n+ K8s 1.24 后移除了 Dockershim，生产环境更推荐直接使用 Containerd 作为运行时。\n\n#### 4. 操作命令\n\n+ Docker 提供 docker 命令，支持 build 构建、exec 进入容器执行命令、logs 查看日志、compose 多容器编排等全套功能。\n+ Containerd 原生 ctr 主要用于调试，日常管理更常用 nerdctl，它的命令体验更接近 docker。\n\n最后一句话总结：\n\nDocker 是一个完整的容器平台，它内部依赖 Containerd 来管理容器；而 Containerd 是一个轻量、高效的纯运行时，更适配 K8s 生产环境。"
+  },
+  {
+    "id": 2,
+    "cat": "docker",
+    "title": "请你简单说说 Docker 的核心原理",
+    "core": "Docker 的核心原理可以概括为三个底层技术：\n\n1. Namespace：负责资源隔离，让容器看不见别人。\n2. Cgroups：负责资源限制，防止容器多吃多占。\n3. UnionFS / OverlayFS：负责分层存储，基础镜像层共享，容器只写自己的可写层。\n\n一句话：Namespace 负责隔离，Cgroups 负责限额，UnionFS 负责镜像分层，三者共同实现 Docker 比虚拟机更轻量、启动更快。",
+    "detail": "面试官你好，我觉得 Docker 的核心原理可以概括为三个底层技术：Namespace、Cgroups、UnionFS。\n\n#### 1. Namespace：实现资源隔离\n\nDocker 为每个容器创建独立的命名空间，包括：\n\n+ PID：进程命名空间\n+ NET：网络命名空间\n+ MNT：挂载点命名空间\n+ UTS：主机名命名空间\n+ USER：用户命名空间\n\n这样容器内的进程只能看到自己的资源，让每个容器看起来像一台独立机器，互不干扰。\n\n#### 2. Cgroups：实现资源限制\n\nDocker 通过 Cgroups 限制容器可以使用的宿主机资源，例如：\n\n+ CPU\n+ 内存\n+ 磁盘 IO\n+ 进程数量\n\n它可以防止单个容器把整台物理机资源耗尽，保障宿主机和其他容器的稳定性。\n\n#### 3. UnionFS：实现分层存储\n\nDocker 使用 UnionFS，生产中常见的是 OverlayFS，把多个只读镜像层和一个容器可写层联合挂载。\n\n基础镜像层只读并且可以共享，容器运行时产生的修改写入自己的可写层。\n\n比如同一台机器上启动 100 个 Nginx 容器，底层 Nginx 镜像只需要存一份，每个容器只保存自己的增量修改，所以更省空间、启动也更快。\n\n总结一句话：\n\nNamespace 负责看不见别人，Cgroups 负责别多吃多占，UnionFS 负责一份底片洗一百张照片。三者共同实现了 Docker 一次构建、到处运行，比传统虚拟机更轻量、启动更快。"
+  },
+  {
+    "id": 1,
     "cat": "database",
     "title": "什么是事务？四大特性 ACID？",
     "core": "**事务**：一组 SQL 操作，要么全部执行成功，要么全部回滚。\n**ACID**：\n+ A 原子性：操作不可分割\n+ C 一致性：事务前后数据完整性一致\n+ I 隔离性：多事务互不干扰\n+ D 持久性：事务提交后数据永久生效",
@@ -10,8 +24,8 @@
     "id": 2,
     "cat": "database",
     "title": "sql优化",
-    "core": "#### 01说说慢sql的优化思路\n+ 开启慢查询日志，定位慢 SQL\n+ 使用 `explain` 分析执行计划\n+ 优化索引：加合适索引、避免索引失效\n+ 减少回表，使用覆盖索引\n+ 大表分页优化、避免大事务、减少 join",
-    "detail": "#### 01说说慢sql的优化思路\n\n+ 开启慢查询日志，定位慢 SQL\n+ 使用 `explain` 分析执行计划\n+ 优化索引：加合适索引、避免索引失效\n+ 减少回表，使用覆盖索引\n+ 大表分页优化、避免大事务、减少 join\n+ 拆分大 SQL，避免全表扫描\n\n#### 02  explain 核心字段\n\n+ type：访问类型，**system > const > eq_ref > ref > range > index > all**，避免 all 全表扫描\n+ key：实际使用的索引\n+ rows：扫描行数，越小越好\n+ Extra：Using filesort（文件排序）、Using temporary（临时表）需优化\n\n#### 03 大分页查询\n\n+ 原写法：`limit 100000,10` 扫描大量数据\n+ 优化：利用主键索引分页 `where id>100000 limit 10`\n\n```sh\n-- ❌ 深分页性能差\nSELECT * FROM users LIMIT 100000, 10;\n\n-- ✅ 使用游标分页\nSELECT * FROM users WHERE id > 100000 LIMIT 10;\n```"
+    "core": "## 01说说慢sql的优化思路\n+ 开启慢查询日志，定位慢 SQL\n+ 使用 `explain` 分析执行计划\n+ 优化索引：加合适索引、避免索引失效\n+ 减少回表，使用覆盖索引\n+ 大表分页优化、避免大事务、减少 join",
+    "detail": "## 01说说慢sql的优化思路\n\n+ 开启慢查询日志，定位慢 SQL\n+ 使用 `explain` 分析执行计划\n+ 优化索引：加合适索引、避免索引失效\n+ 减少回表，使用覆盖索引\n+ 大表分页优化、避免大事务、减少 join\n+ 拆分大 SQL，避免全表扫描\n\n## 02  explain 核心字段\n\n+ type：访问类型，**system > const > eq_ref > ref > range > index > all**，避免 all 全表扫描\n+ key：实际使用的索引\n+ rows：扫描行数，越小越好\n+ Extra：Using filesort（文件排序）、Using temporary（临时表）需优化\n\n## 03 大分页查询\n\n+ 原写法：`limit 100000,10` 扫描大量数据\n+ 优化：利用主键索引分页 `where id>100000 limit 10`\n\n```sh\n-- ❌ 深分页性能差\nSELECT * FROM users LIMIT 100000, 10;\n\n-- ✅ 使用游标分页\nSELECT * FROM users WHERE id > 100000 LIMIT 10;\n```"
   },
   {
     "id": 3,
@@ -73,8 +87,8 @@
     "id": 2,
     "cat": "k8s",
     "title": "什么是CNI、CSI、CRI、LB？它们在K8s中的作用是什么？",
-    "core": "CNI、CSI、CRI 是Kubernetes的三大核心扩展接口，分别定义了网络、存储、运行时的标准；而LB是Service的一种对外暴露方式，通常依赖云厂商或软件实现。\n#### 2.1 CNI\n- **CNI (Container Network Interface)**: 容器网络接口，负责为Pod分配IP地址、让pod之间能够相互通信。常见插件有Calico、Flannel。\n| 插件     | 特点                                                         | 适用场景           |",
-    "detail": "CNI、CSI、CRI 是Kubernetes的三大核心扩展接口，分别定义了网络、存储、运行时的标准；而LB是Service的一种对外暴露方式，通常依赖云厂商或软件实现。\n\n#### 2.1 CNI\n\n- **CNI (Container Network Interface)**: 容器网络接口，负责为Pod分配IP地址、让pod之间能够相互通信。常见插件有Calico、Flannel。\n\n| 插件     | 特点                                                         | 适用场景           |\n| -------- | ------------------------------------------------------------ | ------------------ |\n| Flannel  | 架构简单，支持 VXLAN/host-gw，性能中等，vxlan每次转发都要额外封包/解包 | 测试/小规模集群    |\n| Calico   | BGP路由协议实现纯三层路由转发，支持 NetworkPolicy（相当于pod级别的防火墙），性能优秀 | 生产环境首选       |\n| Cilium   | 基于 eBPF，高性能，L7 可见性，支持 Service Mesh              | 高性能/安全要求高  |\n| Weave    | 支持加密，配置简单                                           | 中小型集群         |\n| kube-OVN | **企业级网络架构师**  基于 OVN/OVS，功能丰富                 | OpenShift/大型集群 |\n\n> Flannel：最简单、最轻量，只做网络连通，啥高级功能都没有\n> Calico：纯三层路由 + BGP，性能强，NetworkPolicy 强，通用云原生首选\n> Kube-OVN：企业级 SDN 架构，VPC 多租户、Underlay 强、功能最全，灵雀云自家核心 CNI\n\n#### 2.2 CSI\n\n- **CSI (Container Storage Interface)**: 容器存储接口，让外部存储卷能以标准化的方式被Pod挂载使用，提供持久化存储能力。通过 CSI 接口对接第三方存储插件（如 NFS、CephFS、各厂商云盘），实现存储卷（PV、PVC）的创建、挂载、卸载、删除，让 Pod 能像使用本地磁盘一样使用外部持久化存储，保障数据的持久性（如数据库 Pod 的数据留存）。\n\n**存储流程：**\n\n1. 用户创建PVC，声明存储需求（大小、访问模式、StorageClass）；\n2. PV Controller通过StorageClass调用CSI插件创建PV，并完成PVC与PV绑定；\n3. Pod调度后，kubelet调用CSI插件将存储挂载至容器；\n4. Pod删除时，CSI插件依次执行存储卸载、解绑及删除操作。\n\n#### 2.3 CRI\n\n- **CRI (Container Runtime Interface)：** 容器运行时接口，如Docker、containerd、CRI-O。\n- CRI负责管理K8s集群容器生命周期，控制平面通过CRI接口对接containerd、CRI-O等容器运行时，发送容器创建、启停、删除等指令，实现二者解耦，提升集群灵活性与可扩展性。\n\n#### 2.4 LB\n\n- **LB (Load Balancer)**: 负载均衡器，分发外部流量到后端服务"
+    "core": "CNI、CSI、CRI 是Kubernetes的三大核心扩展接口，分别定义了网络、存储、运行时的标准；而LB是Service的一种对外暴露方式，通常依赖云厂商或软件实现。\n## 2.1 CNI\n- **CNI (Container Network Interface)**: 容器网络接口，负责为Pod分配IP地址、让pod之间能够相互通信。常见插件有Calico、Flannel。\n| 插件     | 特点                                                         | 适用场景           |",
+    "detail": "CNI、CSI、CRI 是Kubernetes的三大核心扩展接口，分别定义了网络、存储、运行时的标准；而LB是Service的一种对外暴露方式，通常依赖云厂商或软件实现。\n\n##2.1 CNI\n\n- **CNI (Container Network Interface)**: 容器网络接口，负责为Pod分配IP地址、让pod之间能够相互通信。常见插件有Calico、Flannel。\n\n| 插件     | 特点                                                         | 适用场景           |\n| -------- | ------------------------------------------------------------ | ------------------ |\n| Flannel  | 架构简单，支持 VXLAN/host-gw，性能中等，vxlan每次转发都要额外封包/解包 | 测试/小规模集群    |\n| Calico   | BGP路由协议实现纯三层路由转发，支持 NetworkPolicy（相当于pod级别的防火墙），性能优秀 | 生产环境首选       |\n| Cilium   | 基于 eBPF，高性能，L7 可见性，支持 Service Mesh              | 高性能/安全要求高  |\n| Weave    | 支持加密，配置简单                                           | 中小型集群         |\n| kube-OVN | **企业级网络架构师**  基于 OVN/OVS，功能丰富                 | OpenShift/大型集群 |\n\n> Flannel：最简单、最轻量，只做网络连通，啥高级功能都没有\n> Calico：纯三层路由 + BGP，性能强，NetworkPolicy 强，通用云原生首选\n> Kube-OVN：企业级 SDN 架构，VPC 多租户、Underlay 强、功能最全，灵雀云自家核心 CNI\n\n#### 2.2 CSI\n\n- **CSI (Container Storage Interface)**: 容器存储接口，让外部存储卷能以标准化的方式被Pod挂载使用，提供持久化存储能力。通过 CSI 接口对接第三方存储插件（如 NFS、CephFS、各厂商云盘），实现存储卷（PV、PVC）的创建、挂载、卸载、删除，让 Pod 能像使用本地磁盘一样使用外部持久化存储，保障数据的持久性（如数据库 Pod 的数据留存）。\n\n**存储流程：**\n\n1. 用户创建PVC，声明存储需求（大小、访问模式、StorageClass）；\n2. PV Controller通过StorageClass调用CSI插件创建PV，并完成PVC与PV绑定；\n3. Pod调度后，kubelet调用CSI插件将存储挂载至容器；\n4. Pod删除时，CSI插件依次执行存储卸载、解绑及删除操作。\n\n#### 2.3 CRI\n\n- **CRI (Container Runtime Interface)：** 容器运行时接口，如Docker、containerd、CRI-O。\n- CRI负责管理K8s集群容器生命周期，控制平面通过CRI接口对接containerd、CRI-O等容器运行时，发送容器创建、启停、删除等指令，实现二者解耦，提升集群灵活性与可扩展性。\n\n#### 2.4 LB\n\n- **LB (Load Balancer)**: 负载均衡器，分发外部流量到后端服务"
   },
   {
     "id": 3,
@@ -430,8 +444,8 @@
     "id": 6,
     "cat": "middleware",
     "title": "你们kafka集群怎么搭建的",
-    "core": "我们Kafka 4.1.1 版本的3节点架构，保证高可用，避免单点故障。 **默认启用 KRaft 模式，彻底去除 ZooKeeper 依赖**，新增kraft核心配置实现高可用\n############################# KRaft 核心配置 #############################\nprocess.roles=broker,controller\n# 【关键】每个节点唯一：node-1=1, node-2=2, node-3=3\nnode.id=1\n# 【关键】所有节点必须完全一致！列出所有Controller节点",
-    "detail": "我们Kafka 4.1.1 版本的3节点架构，保证高可用，避免单点故障。 **默认启用 KRaft 模式，彻底去除 ZooKeeper 依赖**，新增kraft核心配置实现高可用\n\n```sh\n############################# KRaft 核心配置 #############################\nprocess.roles=broker,controller\n# 【关键】每个节点唯一：node-1=1, node-2=2, node-3=3\nnode.id=1\n# 【关键】所有节点必须完全一致！列出所有Controller节点\ncontroller.quorum.voters=1@kafka-node-01:9093,2@kafka-node-02:9093,3@kafka-node-03:9093\ncontroller.listener.names=CONTROLLER\n```"
+    "core": "我们Kafka 4.1.1 版本的3节点架构，保证高可用，避免单点故障。 **默认启用 KRaft 模式，彻底去除 ZooKeeper 依赖**，新增kraft核心配置实现高可用\n## KRaft 核心配置 ##\nprocess.roles=broker,controller\n# 【关键】每个节点唯一：node-1=1, node-2=2, node-3=3\nnode.id=1\n# 【关键】所有节点必须完全一致！列出所有Controller节点",
+    "detail": "我们Kafka 4.1.1 版本的3节点架构，保证高可用，避免单点故障。 **默认启用 KRaft 模式，彻底去除 ZooKeeper 依赖**，新增kraft核心配置实现高可用\n\n```sh\n## KRaft 核心配置 ##\nprocess.roles=broker,controller\n# 【关键】每个节点唯一：node-1=1, node-2=2, node-3=3\nnode.id=1\n# 【关键】所有节点必须完全一致！列出所有Controller节点\ncontroller.quorum.voters=1@kafka-node-01:9093,2@kafka-node-02:9093,3@kafka-node-03:9093\ncontroller.listener.names=CONTROLLER\n```"
   },
   {
     "id": 7,
@@ -444,8 +458,8 @@
     "id": 8,
     "cat": "middleware",
     "title": "生产环境部署 Kafka 时，如何确保节点间通信正常？关键配置有哪些？",
-    "core": "核心是 **配置主机名解析和正确的监听器**\n+ 主机名配置：每个节点设置唯一主机名（如 kafka-node-01），并在所有节点 `/etc/hosts` 中添加所有节点的 IP + 主机名映射，避免依赖 DNS；\n+ 监听器配置\n############################# 网络监听器 #############################\n# 外部客户端访问端口 (9092) 和 Controller内部通信端口 (9093)\nlisteners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093",
-    "detail": "核心是 **配置主机名解析和正确的监听器**\n\n+ 主机名配置：每个节点设置唯一主机名（如 kafka-node-01），并在所有节点 `/etc/hosts` 中添加所有节点的 IP + 主机名映射，避免依赖 DNS；\n+ 监听器配置\n\n```sh\n############################# 网络监听器 #############################\n# 外部客户端访问端口 (9092) 和 Controller内部通信端口 (9093)\nlisteners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093\ninter.broker.listener.name=SASL_PLAINTEXT\n# 【关键】各节点需改为自己的主机名/IP\nadvertised.listeners=SASL_PLAINTEXT://kafka-node-01:9092\nlistener.security.protocol.map=CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT\n```"
+    "core": "核心是 **配置主机名解析和正确的监听器**\n+ 主机名配置：每个节点设置唯一主机名（如 kafka-node-01），并在所有节点 `/etc/hosts` 中添加所有节点的 IP + 主机名映射，避免依赖 DNS；\n+ 监听器配置\n## 网络监听器 ##\n# 外部客户端访问端口 (9092) 和 Controller内部通信端口 (9093)\nlisteners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093",
+    "detail": "核心是 **配置主机名解析和正确的监听器**\n\n+ 主机名配置：每个节点设置唯一主机名（如 kafka-node-01），并在所有节点 `/etc/hosts` 中添加所有节点的 IP + 主机名映射，避免依赖 DNS；\n+ 监听器配置\n\n```sh\n## 网络监听器 ##\n# 外部客户端访问端口 (9092) 和 Controller内部通信端口 (9093)\nlisteners=SASL_PLAINTEXT://:9092,CONTROLLER://:9093\ninter.broker.listener.name=SASL_PLAINTEXT\n# 【关键】各节点需改为自己的主机名/IP\nadvertised.listeners=SASL_PLAINTEXT://kafka-node-01:9092\nlistener.security.protocol.map=CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT\n```"
   },
   {
     "id": 9,
